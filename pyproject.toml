@@ -1,0 +1,9 @@
+[project]
+name = "jobplan-risk-layer-guided"
+version = "0.1.0"
+description = "Repo-guided ML/risk scoring layer for AI Job Plan Analyser POC"
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
