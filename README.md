@@ -1,228 +1,312 @@
-# AI JobPlan Risk Layer POC
+# JobPlan ML Risk Layer POC
 
-This repository contains the Machine Learning risk-scoring layer for the **AI-Driven Job Plan Analyser** POC.
+This repository contains the **JobPlan ML Risk Layer POC** for the AI JobPlan Analyser demo.
 
-The goal of this POC is to score JobPlans, identify operational risk, and highlight which plans should be prioritised for review by Clinical Directors, Medical Staffing, Workforce Planning, Product, or Engineering stakeholders.
+The purpose of this POC is to show how JobPlans can be scored, prioritised, and explained using a lightweight ML layer. The model produces a **risk score from 0 to 100**, assigns a risk category, and identifies the main operational risk drivers behind each JobPlan.
 
-## What this POC provides
-
-* JobPlan risk scoring
-* High / Medium / Low risk categorisation
-* Main risk drivers per JobPlan
-* Trust / specialty hotspot analysis
-* Model training and evaluation
-* Stakeholder-facing Streamlit dashboard
-* Structured CSV / JSON outputs
-* API-ready scoring output for integration with Bedrock, n8n, rule engine, or future JobPlan analyser services
+The current version is designed for demo and stakeholder review. It includes the dashboard, API, trained model, metadata, evaluation report, sample dataset, and generated risk score outputs.
 
 ---
 
 ## Important POC Note
 
-The current dataset used in this repository is **synthetic staging-shaped data**.
+This is a **proof of concept**, not a production model.
 
-It is **not real customer data** and **not real production/staging data**.
+The current dataset is **synthetic / staging-shaped** and the labels are **pseudo-labelled** using operational risk rules. The model validates the ML pipeline, API, dashboard, and integration shape.
 
-The current model results validate:
-
-* The ML pipeline
-* The scoring flow
-* The dashboard experience
-* The integration output shape
-* The ability to prioritise JobPlans using risk signals
-
-The current results should **not** be presented as production accuracy.
-
-Correct POC wording:
-
-> The POC validates that the ML risk-scoring pipeline can prioritise JobPlans and explain likely risk drivers using synthetic and pseudo-labelled data.
-
-Do not claim:
-
-> The model is production accurate.
-
-Production validation will require:
-
-* Real staging or historical JobPlan data
-* Real outcome labels
-* Domain expert review
-* Data protection review
-* Model monitoring
-* Governance and product approval
+The next step is to replace the synthetic dataset with a real staging extract and validate the highest-risk plans with domain experts.
 
 ---
 
-## POC Objective
+## What This POC Provides
 
-The ML layer supports the AI Job Plan Analyser by producing a structured risk score for each JobPlan.
+The POC supports:
 
-The output helps answer:
-
-* Which JobPlans need immediate review?
-* Which Trust areas or specialties have the highest concentration of risk?
-* Which plans show SPA/DCC imbalance?
-* Which plans may not align with demand and capacity?
-* Which plans show workflow instability?
-* Which plans have compliance or PA limit risk?
-* What are the main explainable drivers behind each risk score?
-
----
-
-## Dataset
-
-Expected input file:
-
-```text
-data/staging_plan_features.csv
-```
-
-Dataset grain:
-
-```text
-1 row = 1 JobPlan
-```
-
-The dataset is a prepared ML feature table. It is **not raw WorkEpisode data**.
-
-The expected dataset includes prepared and cleaned features from areas such as:
-
-* JobPlan identity
-* Trust / department / specialty context
-* Planning year
-* Workflow stage
-* Total PA values
-* DCC PA values
-* SPA PA values
-* CP / other PA values
-* Prior-year PA values
-* Peer benchmark values
-* PA limit breach signal
-* TeamJobPlan alignment signal
-* Workflow instability signal
-* Mediation / appeal signal
-* Locum and grade context
-
-The extract should avoid:
-
-* Clinician names
-* GMC numbers
-* Free-text comments
-* Patient data
-* Sensitive identifiers
-* Raw WorkEpisode rows
-* LLM-generated labels
-
-Hashed identifiers are enough for the POC.
+* JobPlan risk scoring from 0 to 100
+* Risk categories: Low, Medium, High
+* Highest-risk JobPlan review queue
+* Main risk drivers for each JobPlan
+* Evaluation report for the trained model
+* Dashboard for product and stakeholder review
+* FastAPI service for integration
+* Exportable CSV and JSON outputs
+* Pre-trained model artifact included for demo use
 
 ---
 
-## Expected Data Shape
+## Current Dashboard Views
 
-The main dataset should contain columns similar to:
+The Streamlit dashboard includes:
 
-```text
-job_plan_code
-user_code_hash
-trust_level_code
-parent_trust_level_code
-department
-specialty
-planning_year
-plan_stage
-currentStageOrdinal
-daysInCurrentStage
-pAsPerWeek
-paidPA
-minsPerWeek
-ntPerPA
-workType
-doctorClassification
-isSignedUpToNewContract
-isAnnualised
-uses5thWeekPerQuarter
-hasTeamPlanLink
-totalPAs
-dccPAs
-spaPAs
-cpPAs
-otherPAs
-isOnCall
-isShift
-isCPD
-priorTotalPAs
-priorDccPAs
-priorSpaPAs
-yearsSinceLastPlan
-peerMedianSpaShare
-peerMedianDccShare
-peerGroupSize
-paLimitBreach
-spaAbovePeerThreshold
-missingTeamPlanLink
-teamPlanAlignmentScore
-teamDemandPAs
-teamPlannedCapacityPAs
-historyChangeCount
-hasMediationOrAppeal
-hasNewManagerChanges
-planReturnedToDiscussionAfterSignoff
-isLocum
-gradeCode
-isConsultant
-```
+1. **Risk Scores**
+   Summary of scored JobPlans, risk distribution, hotspots, and review signals.
+
+2. **Highest-Risk JobPlans**
+   Shows all High Risk JobPlans sorted from highest to lowest risk score.
+   This is the main stakeholder-facing review queue.
+
+3. **Evaluation**
+   Displays model evaluation results such as accuracy, precision, recall, F1, ROC-AUC, average precision, and confusion matrix.
+
+4. **Training Details**
+   Shows model metadata, feature list, training rows, model mode, and pseudo-label warning.
+
+5. **Dataset**
+   Shows the staging-shaped JobPlan feature dataset used by the POC.
+
+6. **Export / Integration**
+   Provides structured outputs that can be used by other services, rule engines, or LLM explanation layers.
 
 ---
 
 ## Project Structure
 
 ```text
-.
+jobplan-ml-risk-layer-poc/
 ├── dashboard/
 │   └── app.py
 ├── data/
 │   └── staging_plan_features.csv
 ├── models/
-│   └── generated locally after training
+│   ├── metadata.json
+│   └── risk_model.joblib
 ├── outputs/
-│   └── generated locally after scoring/dashboard
+│   ├── evaluation_report.json
+│   ├── risk_scores.csv
+│   ├── risk_scores.json
+│   ├── high_risk_jobplans.csv
+│   └── high_risk_jobplans.json
+├── scripts/
+│   ├── start_api.sh
+│   └── start_dashboard.sh
 ├── src/
+│   ├── analyser_ml/
+│   │   └── api.py
 │   └── jobplan_risk/
-│       ├── __init__.py
 │       ├── api.py
+│       ├── evaluate.py
 │       ├── explain.py
 │       ├── features.py
 │       ├── labels.py
-│       ├── schemas.py
 │       ├── score.py
 │       └── train.py
 ├── tests/
-│   └── test_pipeline.py
 ├── requirements.txt
-├── pyproject.toml
 └── README.md
 ```
 
 ---
 
-## Setup
+## Dataset
 
-Install dependencies:
+The POC uses a staging-shaped dataset:
+
+```text
+data/staging_plan_features.csv
+```
+
+Each row represents one JobPlan or JobPlan version.
+
+Example feature groups:
+
+* PA values: total PAs, DCC PAs, SPA PAs, CP PAs, other PAs
+* Workflow: plan stage, days in current stage, history changes
+* Contract context: annualised, new contract flag, 5th week usage
+* Trend signals: SPA delta, DCC delta, total PA delta
+* Peer comparison: peer median SPA/DCC share, z-scores
+* Team alignment: team-plan link, alignment score, capacity gap
+* Risk flags: PA limit breach, mediation/appeal, returned to discussion
+* Clinician context: consultant flag, locum flag, grade code
+
+---
+
+## Model Approach
+
+The current model is a lightweight scikit-learn model.
+
+Current model mode:
+
+```text
+HistGradientBoostingClassifier
+```
+
+The model predicts a pseudo-labelled operational risk target called:
+
+```text
+pseudo_atRisk
+```
+
+The final score combines:
+
+```text
+ML model risk component + rule-based risk component
+```
+
+The output includes:
+
+* `riskScore`
+* `riskCategory`
+* `mainDrivers`
+* `modelRiskComponent`
+* `ruleRiskComponent`
+* `dataConfidence`
+* `riskInterpretation`
+
+---
+
+## Main Risk Drivers
+
+Main risk drivers are currently identified using deterministic explanation logic.
+
+The ML model predicts the risk component, while the explanation layer ranks the strongest operational risk signals for each JobPlan.
+
+Example drivers include:
+
+* PA limit breach
+* SPA increase compared with prior plan
+* DCC reduction compared with prior plan
+* SPA above peer threshold
+* Low team-plan alignment score
+* Team capacity gap
+* High history change count
+* Mediation or appeal signal
+* Plan returned to discussion after sign-off
+* Missing TeamPlan link
+* Locum flag
+
+This makes the output easier to explain to product and operational stakeholders.
+
+---
+
+## Install Dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-Set the Python path:
+---
+
+## Run the Dashboard
+
+```bash
+./scripts/start_dashboard.sh
+```
+
+Or manually:
 
 ```bash
 export PYTHONPATH=src
+
+python -m streamlit run dashboard/app.py \
+  --server.address 0.0.0.0 \
+  --server.port 8501
+```
+
+Open port:
+
+```text
+8501
+```
+
+---
+
+## Run the API
+
+```bash
+./scripts/start_api.sh
+```
+
+Or manually:
+
+```bash
+export PYTHONPATH=src
+
+python -m uvicorn analyser_ml.api:app \
+  --app-dir src \
+  --reload \
+  --host 0.0.0.0 \
+  --port 8000
+```
+
+Open port:
+
+```text
+8000
+```
+
+---
+
+## API Endpoints
+
+Health check:
+
+```http
+GET /health
+```
+
+Score one JobPlan:
+
+```http
+GET /api/v1/jobplans/{jobPlanCode}/analysis
+```
+
+Department summary:
+
+```http
+GET /api/v1/departments/{trustLevelCode}/summary
+```
+
+Batch analysis:
+
+```http
+POST /api/v1/analysis/batch
+```
+
+Scenario simulation:
+
+```http
+POST /api/v1/scenarios/simulate
+```
+
+Legacy scoring endpoint:
+
+```http
+POST /score
+```
+
+---
+
+## Example API Output Shape
+
+```json
+{
+  "jobPlanCode": "JP-2026-001",
+  "riskScore": 87.4,
+  "riskCategory": "High",
+  "mainDrivers": [
+    "SPA increased compared with prior plan.",
+    "Team-plan alignment score is low.",
+    "High history change count detected."
+  ],
+  "dataConfidence": "High",
+  "modelMode": "hist_gradient_boosting",
+  "modelRiskComponent": 91.2,
+  "ruleRiskComponent": 82.7,
+  "riskInterpretation": "This JobPlan should be prioritised for review."
+}
 ```
 
 ---
 
 ## Train the Model
 
+The repository already includes a trained model for demo use.
+
+To retrain:
+
 ```bash
+export PYTHONPATH=src
+
 python -m jobplan_risk.train \
   --input data/staging_plan_features.csv \
   --output-dir models
@@ -235,412 +319,199 @@ models/risk_model.joblib
 models/metadata.json
 ```
 
-The training step prepares features, builds pseudo-risk labels, trains the model, and saves the model artifact.
-
 ---
 
 ## Evaluate the Model
 
 ```bash
+export PYTHONPATH=src
+
 python -m jobplan_risk.evaluate \
   --input data/staging_plan_features.csv \
   --output outputs/evaluation_report.json
 ```
 
-The evaluation report includes:
+This creates:
 
-* Accuracy
-* Precision
-* Recall
-* F1 score
-* ROC-AUC
-* Average precision
-* Confusion matrix
-
-These metrics are useful for validating the POC pipeline.
-
-Because the current dataset is synthetic and pseudo-labelled, high metrics prove that the pipeline works, but they do not prove production accuracy.
-
----
-
-## Score JobPlans
-
-```bash
-python -m jobplan_risk.score \
-  --input data/staging_plan_features.csv \
-  --model-dir models > outputs/risk_scores.json
-```
-
-Example output:
-
-```json
-{
-  "jobPlanCode": "JP-2026-000123",
-  "riskScore": 82.4,
-  "riskCategory": "High",
-  "mainDrivers": [
-    "SPA increased compared with prior plan.",
-    "Team-plan alignment score is low.",
-    "High history change count detected."
-  ],
-  "dataConfidence": "High",
-  "modelMode": "supervised",
-  "modelRiskComponent": 88.2,
-  "ruleRiskComponent": 75.1
-}
+```text
+outputs/evaluation_report.json
 ```
 
 ---
 
-## Run the Dashboard
+## Generate Risk Score Outputs
 
 ```bash
 export PYTHONPATH=src
 
-python -m streamlit run dashboard/app.py \
-  --server.address 0.0.0.0 \
-  --server.port 8501
+python - <<'PY'
+import json
+from pathlib import Path
+import pandas as pd
+
+from jobplan_risk.score import score
+
+DATA_PATH = Path("data/staging_plan_features.csv")
+MODEL_DIR = Path("models")
+OUTPUT_DIR = Path("outputs")
+
+OUTPUT_DIR.mkdir(exist_ok=True)
+
+df = pd.read_csv(DATA_PATH)
+scored = score(df, MODEL_DIR)
+scored_df = pd.DataFrame(scored)
+
+scored_df.to_csv(OUTPUT_DIR / "risk_scores.csv", index=False)
+(OUTPUT_DIR / "risk_scores.json").write_text(
+    json.dumps(scored, indent=2),
+    encoding="utf-8"
+)
+
+high_risk_df = scored_df[scored_df["riskCategory"] == "High"].copy()
+high_risk_df = high_risk_df.sort_values("riskScore", ascending=False)
+
+high_risk_df.to_csv(OUTPUT_DIR / "high_risk_jobplans.csv", index=False)
+(OUTPUT_DIR / "high_risk_jobplans.json").write_text(
+    high_risk_df.to_json(orient="records", indent=2),
+    encoding="utf-8"
+)
+
+print("Generated risk score outputs.")
+PY
 ```
 
-In GitHub Codespaces, open the forwarded port:
+This creates:
 
 ```text
-8501
+outputs/risk_scores.csv
+outputs/risk_scores.json
+outputs/high_risk_jobplans.csv
+outputs/high_risk_jobplans.json
 ```
 
 ---
 
-## Dashboard Tabs
+## Demo Outputs Included
 
-The dashboard contains the following tabs:
+The repo includes the following demo outputs:
 
 ```text
-Risk Scores
-Evaluation
-Training Details
-Dataset
-Export / Integration
-```
-
-The **Risk Scores** tab is the main stakeholder view.
-
-It shows:
-
-* Executive summary
-* High / Medium / Low risk counts
-* NHS-style operational risk signals
-* Trust / specialty hotspots
-* Top risk drivers
-* Immediate review queue
-* Top highest-risk JobPlans
-* Full risk score table
-* Downloadable CSV output
-
-The **Evaluation** tab shows model metrics.
-
-The **Training Details** tab shows training metadata and model details.
-
-The **Dataset** tab shows the input feature table and dataset distribution.
-
-The **Export / Integration** tab shows generated files and the scoring output contract.
-
----
-
-## API
-
-Run the API:
-
-```bash
-export PYTHONPATH=src
-
-uvicorn jobplan_risk.api:app \
-  --reload \
-  --host 0.0.0.0 \
-  --port 8000
-```
-
-Health check:
-
-```bash
-curl http://localhost:8000/health
-```
-
-The scoring endpoint can be used by the wider POC flow, including:
-
-* Bedrock narrative layer
-* n8n workflow
-* rule engine
-* demo UI
-* future JobPlan analyser service
-
----
-
-## POC Architecture
-
-```text
-Prepared JobPlan feature extract
-        ↓
-Feature engineering
-        ↓
-Pseudo-risk label generation
-        ↓
-ML training and evaluation
-        ↓
-Risk scoring
-        ↓
-Dashboard / API / Bedrock / n8n integration
-```
-
----
-
-## Model Approach
-
-The POC combines three parts.
-
-### 1. ML Component
-
-The ML component learns patterns from:
-
-* PA mix
-* DCC / SPA balance
-* Prior-year changes
-* Peer context
-* Workflow signals
-* TeamJobPlan alignment
-* Plan stage and history signals
-
-### 2. Rule Component
-
-The rule component captures deterministic signals such as:
-
-* PA limit breach
-* SPA increase
-* Team-plan misalignment
-* High history change count
-* Mediation / appeal
-* Returned-to-discussion signal
-* Missing TeamJobPlan link
-* Locum-related risk signal
-
-### 3. Final Risk Score
-
-The final score blends the ML component and the rule component into a 0-100 risk score.
-
-Risk categories:
-
-```text
-High
-Medium
-Low
-```
-
-The goal is not to replace clinical or management judgement. The goal is to prioritise review and highlight explainable risk drivers.
-
----
-
-## Example Business Interpretation
-
-A high-risk JobPlan may be flagged because:
-
-* SPA has increased compared with the previous plan
-* DCC has reduced compared with the previous plan
-* TeamPlan alignment is low
-* The plan has a high number of changes
-* The plan has been returned to discussion
-* The plan breaches PA limits
-* The plan has mediation or appeal signals
-
-Example stakeholder message:
-
-> This JobPlan has been prioritised for review because it shows SPA/DCC drift, low demand-capacity alignment, and workflow instability. A Clinical Director may want to review the plan before sign-off.
-
----
-
-## Generated Output Files
-
-After running the dashboard or CLI scoring, the following files may be generated:
-
-```text
-outputs/training_metadata.json
 outputs/evaluation_report.json
 outputs/risk_scores.csv
 outputs/risk_scores.json
+outputs/high_risk_jobplans.csv
+outputs/high_risk_jobplans.json
 ```
 
-Model artifacts are generated under:
+This allows the dashboard and API to be used for demo purposes without retraining.
+
+---
+
+## Current Model Metadata
+
+The model metadata is stored in:
 
 ```text
-models/
+models/metadata.json
 ```
 
-These are local/generated outputs and do not need to be committed unless specifically required for demo packaging.
+It includes:
 
----
-
-## Current Status
-
-Implemented:
-
-* Synthetic staging-shaped dataset
-* Feature preparation
-* Pseudo-label generation
-* Model training
-* Model evaluation
-* Risk scoring
-* Streamlit dashboard
-* Stakeholder-friendly Risk Scores tab
-* Trust / specialty hotspot view
-* Immediate review queue
-* Exportable CSV and JSON outputs
-* FastAPI scoring endpoint
-
----
-
-## Next Steps
-
-Recommended next steps:
-
-1. Replace synthetic data with real read-only staging extract.
-2. Validate top-risk JobPlans with domain experts.
-3. Confirm which risk drivers are most useful for Product and Clinical stakeholders.
-4. Connect risk output to Bedrock / n8n / rule-engine flow.
-5. Review data protection and governance requirements.
-6. Add monitoring for model drift and score stability.
-7. Define production-grade outcome labels.
-8. Validate fairness and bias across departments, specialties and staff groups.
-9. Decide whether the ML layer should remain standalone or become part of a wider JobPlan analyser service.
-
----
-
-## Real Staging Data Request
-
-For real validation, the team should provide a read-only extract with:
-
-```text
-1 row per active JobPlan
-```
-
-Required data areas:
-
-* JobPlan code
-* Hashed user identifier
-* Trust / department / specialty
-* Planning year
-* Plan stage
-* PA totals
-* DCC / SPA split
-* Prior-year PA values
-* Peer medians
-* PA limit breach flag
-* TeamPlan link / alignment
-* History change count
-* Mediation / appeal signal
-* Returned-to-discussion signal
-* Locum flag
-* Grade code
-
-Do not include:
-
-* Names
-* GMC numbers
-* Patient data
-* Free-text comments
-* Raw WorkEpisode rows
-* Sensitive identifiers
-
----
-
-## Production Caution
-
-This POC should not be presented as a production-validated clinical, workforce, or compliance model.
-
-The right message is:
-
-> The POC validates that a JobPlan ML risk layer can score plans, explain likely risk drivers, and highlight operational hotspots using synthetic/pseudo-labelled data.
-
-Before production use, the model requires:
-
-* Real historical data
-* Real outcome labels
-* Data quality validation
-* Domain expert validation
-* Data protection review
-* Governance approval
-* Monitoring
-* Explainability review
-* Product sign-off
+* Training rows
+* Positive rate
+* Feature columns
+* Label type
+* Model mode
+* ROC-AUC
+* Average precision
+* POC warning
 
 ---
 
 ## Demo Talk Track
 
-Suggested demo wording:
+A safe way to explain the POC:
 
-> The first tab is the stakeholder view. It shows operational impact first: which JobPlans, Trust areas, and specialties need review, why they are risky, and what action should be taken.
+```text
+This is the JobPlan ML risk scoring layer. It scores each JobPlan from 0 to 100 and prioritises which plans may need review first.
 
-> The ML layer produces a structured risk score and top drivers for each JobPlan. This output can be passed to the rule engine, Bedrock narrative layer, or n8n workflow to generate manager-friendly explanations.
+The score is based on operational risk signals such as SPA/DCC drift, PA limit breaches, team-plan misalignment, workflow instability, and peer deviation.
 
-> The current dataset is synthetic and pseudo-labelled, so this validates the pipeline and the dashboard flow. The next step is to replace it with real staging data and validate the top-risk plans with domain experts.
+The current dataset is synthetic and pseudo-labelled, so this validates the pipeline, dashboard, and integration shape. The next step is to replace the data with a real staging extract and validate the highest-risk plans with domain experts.
+```
 
 ---
 
-## Useful Commands
+## What This POC Does Not Do Yet
 
-Install:
+This POC does not yet provide:
+
+* Production-grade risk prediction
+* Real customer/staging validation
+* Full contractual compliance engine
+* Final clinical or managerial decisioning
+* LLM-generated final narrative
+* Full what-if optimisation
+* Production deployment pipeline
+
+---
+
+## Recommended Next Steps
+
+1. Replace synthetic dataset with real staging extract.
+2. Validate highest-risk JobPlans with domain experts.
+3. Separate pure ML features from rule-derived pseudo-label features.
+4. Add SHAP or model-level feature contribution explanations.
+5. Integrate rule-engine findings with ML output.
+6. Add LLM-generated executive explanation from structured evidence.
+7. Add governance around model versioning, monitoring, and retraining.
+8. Prepare production architecture if the POC is accepted.
+
+---
+
+## Production Caution
+
+The current model should not be used for final decisions.
+
+It is suitable for:
+
+* Demo
+* Stakeholder review
+* Pipeline validation
+* Integration testing
+* Product discovery
+* Review prioritisation concept
+
+It is not yet suitable for:
+
+* Production risk classification
+* Contractual compliance decisions
+* Clinical decision-making
+* Automated approval or rejection of JobPlans
+
+---
+
+## Quick Start for Demo
 
 ```bash
 pip install -r requirements.txt
+./scripts/start_dashboard.sh
 ```
 
-Set Python path:
+Open port:
 
-```bash
-export PYTHONPATH=src
+```text
+8501
 ```
 
-Train:
+For API demo:
 
 ```bash
-python -m jobplan_risk.train \
-  --input data/staging_plan_features.csv \
-  --output-dir models
+./scripts/start_api.sh
 ```
 
-Evaluate:
+Open port:
 
-```bash
-python -m jobplan_risk.evaluate \
-  --input data/staging_plan_features.csv \
-  --output outputs/evaluation_report.json
-```
-
-Score:
-
-```bash
-python -m jobplan_risk.score \
-  --input data/staging_plan_features.csv \
-  --model-dir models > outputs/risk_scores.json
-```
-
-Run dashboard:
-
-```bash
-python -m streamlit run dashboard/app.py \
-  --server.address 0.0.0.0 \
-  --server.port 8501
-```
-
-Run API:
-
-```bash
-uvicorn jobplan_risk.api:app \
-  --reload \
-  --host 0.0.0.0 \
-  --port 8000
-```
-
-Run tests:
-
-```bash
-pytest
+```text
+8000
 ```
