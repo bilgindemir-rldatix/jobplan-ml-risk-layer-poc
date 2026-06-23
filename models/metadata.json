@@ -1,6 +1,6 @@
 {
-  "training_rows": 12,
-  "positive_rate": 0.5,
+  "training_rows": 5000,
+  "positive_rate": 0.4456,
   "feature_columns": [
     "pAsPerWeek",
     "paidPA",
@@ -53,7 +53,7 @@
   ],
   "label_type": "pseudo_atRisk",
   "warning": "POC model: pseudo-labels are operational risk proxies, not true clinical/contract outcomes.",
-  "model_mode": "isolation_forest_fallback",
-  "score_min": -0.08787291079080484,
-  "score_max": 0.04698144896490297
+  "model_mode": "hist_gradient_boosting",
+  "roc_auc": 1.0,
+  "average_precision": 0.9999999999999998
 }
