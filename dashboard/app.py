@@ -852,9 +852,10 @@ evaluation_report_path.write_text(json.dumps(evaluation_report, indent=2), encod
 scored_df.to_csv(risk_scores_csv_path, index=False)
 risk_scores_json_path.write_text(scored_df.to_json(orient="records", indent=2), encoding="utf-8")
 
-tab_risk, tab_eval, tab_train, tab_data, tab_export = st.tabs(
+tab_risk, tab_high_risk, tab_eval, tab_train, tab_data, tab_export = st.tabs(
     [
         "🚦 Risk Scores",
+        "🔥 Highest-Risk JobPlans",
         "📈 Evaluation",
         "🧠 Training Details",
         "📄 Dataset",
@@ -1158,6 +1159,26 @@ with tab_risk:
         file_name="filtered_risk_scores.csv",
         mime="text/csv",
     )
+
+
+with tab_high_risk:
+    st.header("🔥 Highest-Risk JobPlans")
+
+    high_risk_df = scored_df[scored_df["riskCategory"] == "High"].copy()
+    high_risk_df = high_risk_df.sort_values("riskScore", ascending=False).reset_index(drop=True)
+
+    OUTPUT_DIR.mkdir(exist_ok=True)
+    high_risk_df.to_csv(OUTPUT_DIR / "high_risk_jobplans.csv", index=False)
+    (OUTPUT_DIR / "high_risk_jobplans.json").write_text(
+        high_risk_df.to_json(orient="records", indent=2),
+        encoding="utf-8",
+    )
+
+    if len(high_risk_df) == 0:
+        st.success("No High Risk JobPlans found.")
+    else:
+        for _, row in high_risk_df.iterrows():
+            risk_card(row)
 
 
 with tab_eval:
