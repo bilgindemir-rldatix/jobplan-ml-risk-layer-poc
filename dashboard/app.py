@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import json
+import html
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 import streamlit as st
+import streamlit.components.v1 as components
 import plotly.express as px
 from sklearn.ensemble import HistGradientBoostingClassifier
 from sklearn.linear_model import LogisticRegression
@@ -476,6 +478,91 @@ st.markdown(
         fill: #102A21 !important;
     }
 
+    
+    /* Compact Highest-Risk JobPlan cards */
+    .compact-risk-card {
+        background: #FFFFFF;
+        border: 1px solid #D8E7DF;
+        border-left: 8px solid #B3261E;
+        border-radius: 16px;
+        padding: 16px 18px;
+        margin-bottom: 16px;
+        box-shadow: 0 4px 12px rgba(6, 59, 46, 0.08);
+        min-height: 245px;
+    }
+
+    .compact-risk-card * {
+        color: #102A21 !important;
+    }
+
+    .compact-risk-card .jobplan-code {
+        font-size: 20px;
+        font-weight: 850;
+        color: #063B2E !important;
+        margin-bottom: 6px;
+    }
+
+    .compact-risk-card .meta {
+        font-size: 13px;
+        color: #35584A !important;
+        margin-bottom: 4px;
+    }
+
+    .compact-risk-card .risk-score-label {
+        font-size: 10px;
+        font-weight: 800;
+        color: #52635C !important;
+        text-transform: uppercase;
+        letter-spacing: .05em;
+    }
+
+    .compact-risk-card .risk-score {
+        font-size: 34px;
+        font-weight: 900;
+        color: #063B2E !important;
+        margin-top: 2px;
+        line-height: 1;
+    }
+
+    .compact-risk-card .risk-badge {
+        display: inline-block;
+        margin-top: 6px;
+        padding: 4px 10px;
+        border-radius: 999px;
+        background: #FCE8E6;
+        color: #B3261E !important;
+        font-size: 12px;
+        font-weight: 850;
+    }
+
+    .compact-risk-card .section-title {
+        margin-top: 14px;
+        font-size: 11px;
+        font-weight: 850;
+        color: #52635C !important;
+        text-transform: uppercase;
+        letter-spacing: .05em;
+    }
+
+    .compact-risk-card ul {
+        margin: 8px 0 0 18px;
+        padding: 0;
+    }
+
+    .compact-risk-card li {
+        font-size: 13px;
+        color: #102A21 !important;
+        margin-bottom: 5px;
+        line-height: 1.35;
+    }
+
+    .compact-risk-card .action {
+        margin-top: 12px;
+        font-size: 13px;
+        font-weight: 800;
+        color: #063B2E !important;
+    }
+
     </style>
     """,
     unsafe_allow_html=True,
@@ -864,6 +951,227 @@ tab_risk, tab_high_risk, tab_eval, tab_train, tab_data, tab_export = st.tabs(
 )
 
 
+
+
+def component_risk_card(row):
+    import ast
+
+    job_plan_code = html.escape(str(row.get("jobPlanCode", "N/A")))
+    department = html.escape(str(row.get("department", "N/A")))
+    specialty = html.escape(str(row.get("specialty", "N/A")))
+    plan_stage = html.escape(str(row.get("plan_stage", "N/A")))
+    trust = html.escape(str(row.get("trust_level_code", "N/A")))
+    recommended_action = html.escape(str(row.get("recommendedAction", "Immediate Clinical Director review")))
+
+    try:
+        risk_score = float(row.get("riskScore", 0))
+    except Exception:
+        risk_score = 0.0
+
+    drivers = row.get("mainDrivers", [])
+
+    if isinstance(drivers, str):
+        try:
+            parsed = ast.literal_eval(drivers)
+            drivers = parsed if isinstance(parsed, list) else [drivers]
+        except Exception:
+            if " | " in drivers:
+                drivers = drivers.split(" | ")
+            elif ";" in drivers:
+                drivers = drivers.split(";")
+            else:
+                drivers = [drivers]
+
+    if not isinstance(drivers, list):
+        drivers = [str(drivers)]
+
+    drivers = [str(d).strip() for d in drivers if str(d).strip()]
+
+    drivers_html = "".join(
+        [
+            f"""
+            <div class="driver">
+                <span class="dot">•</span>
+                <span>{html.escape(driver)}</span>
+            </div>
+            """
+            for driver in drivers[:3]
+        ]
+    )
+
+    if not drivers_html:
+        drivers_html = '<div class="driver muted">No risk drivers available.</div>'
+
+    card_html = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+    <style>
+        html, body {{
+            margin: 0;
+            padding: 0;
+            background: transparent;
+            font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        }}
+
+        .card {{
+            height: 430px;
+            box-sizing: border-box;
+            background: linear-gradient(180deg, #FFFFFF 0%, #F7FCFA 100%);
+            border: 3px solid #0B6F4F;
+            border-left: 12px solid #B3261E;
+            border-radius: 24px;
+            padding: 18px 18px 16px 18px;
+            box-shadow:
+                0 18px 42px rgba(6, 59, 46, 0.26),
+                0 5px 14px rgba(6, 59, 46, 0.14),
+                inset 0 1px 0 rgba(255, 255, 255, 0.95);
+            overflow: hidden;
+        }}
+
+        .top {{
+            display: flex;
+            justify-content: space-between;
+            gap: 14px;
+            align-items: flex-start;
+        }}
+
+        .label {{
+            font-size: 10px;
+            font-weight: 900;
+            color: #52635C;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            margin-bottom: 6px;
+        }}
+
+        .code {{
+            font-size: 19px;
+            font-weight: 900;
+            color: #063B2E;
+            letter-spacing: -0.02em;
+            margin-bottom: 8px;
+        }}
+
+        .meta {{
+            font-size: 12.5px;
+            color: #35584A;
+            margin-bottom: 5px;
+            line-height: 1.35;
+        }}
+
+        .risk-box {{
+            min-width: 98px;
+            text-align: right;
+            background: #EFF8F3;
+            border: 2px solid #CFE7DC;
+            border-radius: 18px;
+            padding: 10px;
+            box-shadow: 0 8px 18px rgba(6, 59, 46, 0.14);
+        }}
+
+        .score {{
+            font-size: 34px;
+            font-weight: 950;
+            color: #063B2E;
+            line-height: 1;
+            margin-top: 4px;
+        }}
+
+        .badge {{
+            display: inline-block;
+            margin-top: 8px;
+            padding: 5px 10px;
+            border-radius: 999px;
+            background: #FCE8E6;
+            border: 1px solid #F4B8B3;
+            color: #B3261E;
+            font-size: 12px;
+            font-weight: 900;
+            box-shadow: 0 4px 10px rgba(179, 38, 30, 0.12);
+        }}
+
+        .divider {{
+            height: 1px;
+            background: #CFE7DC;
+            margin: 14px 0 12px 0;
+        }}
+
+        .driver-panel {{
+            background: #FFFFFF;
+            border: 2px solid #CFE7DC;
+            border-radius: 16px;
+            padding: 12px;
+            min-height: 135px;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.95);
+        }}
+
+        .driver {{
+            display: flex;
+            gap: 7px;
+            align-items: flex-start;
+            font-size: 12.5px;
+            line-height: 1.35;
+            color: #102A21;
+            margin-bottom: 7px;
+        }}
+
+        .dot {{
+            color: #B3261E;
+            font-weight: 900;
+        }}
+
+        .muted {{
+            color: #52635C;
+            font-style: italic;
+        }}
+
+        .action {{
+            margin-top: 10px;
+            padding: 9px 11px;
+            border-radius: 14px;
+            background: #F3FAF6;
+            border: 2px solid #CFE7DC;
+            font-size: 12.5px;
+            font-weight: 850;
+            line-height: 1.35;
+            color: #063B2E;
+        }}
+    </style>
+    </head>
+    <body>
+        <div class="card">
+            <div class="top">
+                <div>
+                    <div class="label">JobPlan</div>
+                    <div class="code">{job_plan_code}</div>
+                    <div class="meta">{department} / {specialty}</div>
+                    <div class="meta">Stage: {plan_stage} | Trust: {trust}</div>
+                </div>
+
+                <div class="risk-box">
+                    <div class="label">Risk Score</div>
+                    <div class="score">{risk_score:.1f}</div>
+                    <div class="badge">🔴 High</div>
+                </div>
+            </div>
+
+            <div class="divider"></div>
+
+            <div class="driver-panel">
+                <div class="label">Main Risk Drivers</div>
+                {drivers_html}
+            </div>
+
+            <div class="action">Recommended action: {recommended_action}</div>
+        </div>
+    </body>
+    </html>
+    """
+
+    components.html(card_html, height=470, scrolling=False)
+
+
 with tab_risk:
     st.header("🚦 Executive JobPlan Risk View")
 
@@ -1177,8 +1485,16 @@ with tab_high_risk:
     if len(high_risk_df) == 0:
         st.success("No High Risk JobPlans found.")
     else:
-        for _, row in high_risk_df.iterrows():
-            risk_card(row)
+        num_cols = 4
+        rows = list(high_risk_df.iterrows())
+
+        for i in range(0, len(rows), num_cols):
+            cols = st.columns(num_cols, gap="large")
+            for j in range(num_cols):
+                if i + j < len(rows):
+                    _, row = rows[i + j]
+                    with cols[j]:
+                        component_risk_card(row)
 
 
 with tab_eval:
