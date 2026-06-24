@@ -515,3 +515,9 @@ Open port:
 ```text
 8000
 ```
+
+```bash
+pip install -r requirements.txt
+export PYTHONPATH=src
+python -m streamlit run dashboard/app.py --server.address 0.0.0.0 --server.port 8501
+```
