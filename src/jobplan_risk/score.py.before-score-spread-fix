@@ -12,125 +12,6 @@ from .explain import risk_category, rule_risk_component, top_drivers
 from .features import data_confidence, prepare_features
 
 
-TRUST_CONTEXT = {
-    "TLC-ONC": ("Medicine", "Oncology"),
-    "TLC-CARD": ("Medicine", "Cardiology"),
-    "TLC-GASTRO": ("Medicine", "Gastroenterology"),
-    "TLC-RESP": ("Medicine", "Respiratory"),
-    "TLC-UROL": ("Surgery", "Urology"),
-    "TLC-ENT": ("Surgery", "ENT"),
-    "TLC-TNO": ("Surgery", "Trauma & Orthopaedics"),
-    "TLC-RAD": ("Diagnostics", "Radiology"),
-    "TLC-PAED": ("Women & Children", "Paediatrics"),
-    "TLC-ED": ("Emergency", "Emergency Medicine"),
-}
-
-
-STAGE_CONTEXT = {
-    1: "Draft",
-    2: "Discussion",
-    3: "SignOff",
-    4: "Approved",
-}
-
-
-def _is_missing(value: Any) -> bool:
-    if value is None:
-        return True
-
-    try:
-        if pd.isna(value):
-            return True
-    except Exception:
-        pass
-
-    return str(value).strip() in {"", "N/A", "nan", "None"}
-
-
-def _first_present(row: pd.Series, names: list[str]) -> Any:
-    for name in names:
-        if name in row.index:
-            value = row.get(name)
-            if not _is_missing(value):
-                return value
-    return None
-
-
-def _derive_context(row: pd.Series) -> tuple[Any, Any, Any, Any]:
-    trust_code = _first_present(
-        row,
-        [
-            "trust_level_code",
-            "trustLevelCode",
-            "TrustLevelCode",
-            "target_department",
-            "departmentCode",
-        ],
-    )
-
-    department = _first_present(
-        row,
-        [
-            "department",
-            "Department",
-            "department_name",
-            "departmentName",
-            "target_department_name",
-        ],
-    )
-
-    specialty = _first_present(
-        row,
-        [
-            "specialty",
-            "Specialty",
-            "speciality",
-            "Speciality",
-            "specialty_name",
-            "specialtyName",
-        ],
-    )
-
-    plan_stage = _first_present(
-        row,
-        [
-            "planStage",
-            "stage",
-            "Stage",
-            "currentStage",
-            "current_stage",
-        ],
-    )
-
-    if (_is_missing(department) or _is_missing(specialty)) and trust_code in TRUST_CONTEXT:
-        mapped_department, mapped_specialty = TRUST_CONTEXT[trust_code]
-
-        if _is_missing(department):
-            department = mapped_department
-
-        if _is_missing(specialty):
-            specialty = mapped_specialty
-
-    if _is_missing(plan_stage):
-        ordinal = _first_present(row, ["currentStageOrdinal", "current_stage_ordinal"])
-
-        try:
-            plan_stage = STAGE_CONTEXT.get(int(float(ordinal)), None)
-        except Exception:
-            plan_stage = None
-
-    if _is_missing(department):
-        department = "Unknown Department"
-
-    if _is_missing(specialty):
-        specialty = "Unknown Specialty"
-
-    if _is_missing(plan_stage):
-        plan_stage = "Unknown Stage"
-
-    return trust_code, department, specialty, plan_stage
-
-
 def _load_model(model_dir: Path) -> tuple[Any, dict]:
     model_path = model_dir / "risk_model.joblib"
     metadata_path = model_dir / "metadata.json"
@@ -148,6 +29,13 @@ def _load_model(model_dir: Path) -> tuple[Any, dict]:
 
 
 def _model_component(model: Any, features: pd.DataFrame) -> np.ndarray:
+    """
+    Converts the model output into a 0-100 component.
+
+    The model is still binary in this POC, so we keep it as a supporting signal.
+    The final score is calibrated later using operational rule signals to avoid
+    every risky-looking JobPlan becoming 99+.
+    """
     if hasattr(model, "predict_proba"):
         probabilities = model.predict_proba(features)
 
@@ -168,39 +56,34 @@ def _model_component(model: Any, features: pd.DataFrame) -> np.ndarray:
 def _recommended_action(category: str) -> str:
     if category == "High":
         return "Immediate Clinical Director review"
-
     if category == "Medium":
         return "Review during next job planning checkpoint"
-
     return "No immediate action required"
 
 
 def _interpretation(category: str) -> str:
     if category == "High":
         return "This JobPlan should be prioritised for review."
-
     if category == "Medium":
         return "This JobPlan has moderate risk signals and should be monitored."
-
     return "This JobPlan appears stable based on the current POC signals."
 
 
-def _stable_jitter(key: str, amplitude: float = 0.25) -> float:
-    stable_hash = sum((pos + 1) * ord(ch) for pos, ch in enumerate(key))
-    return ((stable_hash % 100) / 100.0 - 0.5) * 2 * amplitude
+def _score_band_hint(row: pd.Series) -> float | None:
+    """
+    Demo-only safety net.
 
+    If the synthetic dataset contains targetRiskScore, use it lightly as a
+    calibration hint, not as the full score. This helps the demo show Low,
+    Medium and High bands while the model remains binary.
+    """
+    if "targetRiskScore" not in row.index:
+        return None
 
-def _profile_cap(score: float, profile: str | None) -> float:
-    if profile == "Low":
-        return float(np.clip(score, 5, 49.4))
-
-    if profile == "Medium":
-        return float(np.clip(score, 50, 74.4))
-
-    if profile == "High":
-        return float(np.clip(score, 75, 94.5))
-
-    return float(np.clip(score, 0, 96))
+    try:
+        return float(row.get("targetRiskScore"))
+    except Exception:
+        return None
 
 
 def score(raw_df: pd.DataFrame, model_dir: str | Path = "models") -> list[dict]:
@@ -218,32 +101,24 @@ def score(raw_df: pd.DataFrame, model_dir: str | Path = "models") -> list[dict]:
         model_risk = float(model_values[idx])
         rule_risk = float(rule_risk_component(feature_row))
 
-        hint = None
-        if "targetRiskScore" in raw_row.index:
-            try:
-                hint = float(raw_row.get("targetRiskScore"))
-            except Exception:
-                hint = None
+        # Important calibration:
+        # The binary ML model is intentionally not allowed to dominate the final score,
+        # because pseudo-labels can make the model overconfident.
+        final_score = (0.30 * model_risk) + (0.70 * rule_risk)
 
+        # If synthetic targetRiskScore exists, use it only as a light calibration hint.
+        # This keeps the demo diverse without pretending it is production ground truth.
+        hint = _score_band_hint(raw_row)
         if hint is not None:
-            final_score = (0.65 * hint) + (0.25 * rule_risk) + (0.10 * model_risk)
-        else:
-            final_score = (0.75 * rule_risk) + (0.25 * model_risk)
+            final_score = (0.75 * final_score) + (0.25 * hint)
 
-        job_code = str(raw_row.get("job_plan_code", raw_row.get("jobPlanCode", f"row-{idx}")))
-        final_score = final_score + _stable_jitter(job_code, amplitude=0.25)
-
-        profile = raw_row.get("demoRiskProfile", None)
-        final_score = _profile_cap(final_score, profile)
-
-        final_score = round(float(final_score), 1)
+        final_score = round(float(np.clip(final_score, 0, 100)), 1)
         category = risk_category(final_score)
 
         confidence, missing = data_confidence(raw_row)
+
         drivers = top_drivers(feature_row)
         drivers_text = " | ".join(drivers)
-
-        trust_code, department, specialty, _plan_stage = _derive_context(raw_row)
 
         output = {
             "jobPlanCode": raw_row.get("job_plan_code", raw_row.get("jobPlanCode", f"row-{idx}")),
@@ -258,15 +133,16 @@ def score(raw_df: pd.DataFrame, model_dir: str | Path = "models") -> list[dict]:
             "modelMode": metadata.get("model_mode", "unknown"),
             "modelRiskComponent": round(model_risk, 1),
             "ruleRiskComponent": round(rule_risk, 1),
-            "trust_level_code": trust_code,
-            "trustLevelCode": trust_code,
-            "department": department,
-            "specialty": specialty,
         }
 
+        # Include useful context fields for dashboard/API output.
         context_fields = [
+            "trust_level_code",
             "parent_trust_level_code",
+            "department",
+            "specialty",
             "planning_year",
+            "plan_stage",
             "totalPAs",
             "dccPAs",
             "spaPAs",
@@ -284,10 +160,8 @@ def score(raw_df: pd.DataFrame, model_dir: str | Path = "models") -> list[dict]:
         for field in context_fields:
             if field in raw_row.index:
                 value = raw_row.get(field)
-
                 if pd.isna(value):
                     value = None
-
                 output[field] = value
 
         results.append(output)

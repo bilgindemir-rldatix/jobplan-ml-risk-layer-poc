@@ -1,0 +1,682 @@
+[
+  {
+    "jobPlanCode":"JP-2026-003696",
+    "trustLevelCode":"TLC-ONC",
+    "trust_level_code":"TLC-ONC",
+    "department":"Medicine",
+    "specialty":"Oncology",
+    "riskScore":90.9,
+    "riskCategory":"High",
+    "mainDrivers":[
+      "PA limit breach detected against configured trust limits.",
+      "SPA increased by 1.00 PA compared with prior plan.",
+      "DCC reduced by 1.25 PA compared with prior plan."
+    ],
+    "mainDriversText":"PA limit breach detected against configured trust limits. | SPA increased by 1.00 PA compared with prior plan. | DCC reduced by 1.25 PA compared with prior plan.",
+    "recommendedAction":"Immediate Clinical Director review",
+    "riskInterpretation":"This JobPlan should be prioritised for review.",
+    "dataConfidence":"High",
+    "modelRiskComponent":99.6,
+    "ruleRiskComponent":87.9
+  },
+  {
+    "jobPlanCode":"JP-2026-004762",
+    "trustLevelCode":"TLC-ONC",
+    "trust_level_code":"TLC-ONC",
+    "department":"Medicine",
+    "specialty":"Oncology",
+    "riskScore":88.9,
+    "riskCategory":"High",
+    "mainDrivers":[
+      "PA limit breach detected against configured trust limits.",
+      "SPA increased by 1.00 PA compared with prior plan.",
+      "DCC reduced by 1.00 PA compared with prior plan."
+    ],
+    "mainDriversText":"PA limit breach detected against configured trust limits. | SPA increased by 1.00 PA compared with prior plan. | DCC reduced by 1.00 PA compared with prior plan.",
+    "recommendedAction":"Immediate Clinical Director review",
+    "riskInterpretation":"This JobPlan should be prioritised for review.",
+    "dataConfidence":"High",
+    "modelRiskComponent":99.6,
+    "ruleRiskComponent":85.0
+  },
+  {
+    "jobPlanCode":"JP-2022-003479",
+    "trustLevelCode":"TLC-UROL",
+    "trust_level_code":"TLC-UROL",
+    "department":"Surgery",
+    "specialty":"Urology",
+    "riskScore":86.3,
+    "riskCategory":"High",
+    "mainDrivers":[
+      "PA limit breach detected against configured trust limits.",
+      "SPA increased by 1.25 PA compared with prior plan.",
+      "DCC reduced by 1.25 PA compared with prior plan."
+    ],
+    "mainDriversText":"PA limit breach detected against configured trust limits. | SPA increased by 1.25 PA compared with prior plan. | DCC reduced by 1.25 PA compared with prior plan.",
+    "recommendedAction":"Immediate Clinical Director review",
+    "riskInterpretation":"This JobPlan should be prioritised for review.",
+    "dataConfidence":"High",
+    "modelRiskComponent":99.6,
+    "ruleRiskComponent":82.0
+  },
+  {
+    "jobPlanCode":"JP-2023-004776",
+    "trustLevelCode":"TLC-ENT",
+    "trust_level_code":"TLC-ENT",
+    "department":"Surgery",
+    "specialty":"ENT",
+    "riskScore":85.5,
+    "riskCategory":"High",
+    "mainDrivers":[
+      "PA limit breach detected against configured trust limits.",
+      "SPA increased by 1.75 PA compared with prior plan.",
+      "DCC reduced by 0.75 PA compared with prior plan."
+    ],
+    "mainDriversText":"PA limit breach detected against configured trust limits. | SPA increased by 1.75 PA compared with prior plan. | DCC reduced by 0.75 PA compared with prior plan.",
+    "recommendedAction":"Immediate Clinical Director review",
+    "riskInterpretation":"This JobPlan should be prioritised for review.",
+    "dataConfidence":"High",
+    "modelRiskComponent":99.6,
+    "ruleRiskComponent":80.9
+  },
+  {
+    "jobPlanCode":"JP-2025-004238",
+    "trustLevelCode":"TLC-CARD",
+    "trust_level_code":"TLC-CARD",
+    "department":"Medicine",
+    "specialty":"Cardiology",
+    "riskScore":84.3,
+    "riskCategory":"High",
+    "mainDrivers":[
+      "PA limit breach detected against configured trust limits.",
+      "SPA increased by 1.00 PA compared with prior plan.",
+      "DCC reduced by 1.25 PA compared with prior plan."
+    ],
+    "mainDriversText":"PA limit breach detected against configured trust limits. | SPA increased by 1.00 PA compared with prior plan. | DCC reduced by 1.25 PA compared with prior plan.",
+    "recommendedAction":"Immediate Clinical Director review",
+    "riskInterpretation":"This JobPlan should be prioritised for review.",
+    "dataConfidence":"High",
+    "modelRiskComponent":99.6,
+    "ruleRiskComponent":79.0
+  },
+  {
+    "jobPlanCode":"JP-2023-001944",
+    "trustLevelCode":"TLC-NEURO",
+    "trust_level_code":"TLC-NEURO",
+    "department":"Medicine",
+    "specialty":"Neurology",
+    "riskScore":84.2,
+    "riskCategory":"High",
+    "mainDrivers":[
+      "SPA increased by 1.25 PA compared with prior plan.",
+      "DCC reduced by 0.75 PA compared with prior plan.",
+      "High history change count detected (12)."
+    ],
+    "mainDriversText":"SPA increased by 1.25 PA compared with prior plan. | DCC reduced by 0.75 PA compared with prior plan. | High history change count detected (12).",
+    "recommendedAction":"Immediate Clinical Director review",
+    "riskInterpretation":"This JobPlan should be prioritised for review.",
+    "dataConfidence":"High",
+    "modelRiskComponent":99.6,
+    "ruleRiskComponent":79.0
+  },
+  {
+    "jobPlanCode":"JP-2026-001054",
+    "trustLevelCode":"TLC-GENSURG",
+    "trust_level_code":"TLC-GENSURG",
+    "department":"Surgery",
+    "specialty":"General Surgery",
+    "riskScore":82.9,
+    "riskCategory":"High",
+    "mainDrivers":[
+      "PA limit breach detected against configured trust limits.",
+      "SPA increased by 1.00 PA compared with prior plan.",
+      "DCC reduced by 0.75 PA compared with prior plan."
+    ],
+    "mainDriversText":"PA limit breach detected against configured trust limits. | SPA increased by 1.00 PA compared with prior plan. | DCC reduced by 0.75 PA compared with prior plan.",
+    "recommendedAction":"Immediate Clinical Director review",
+    "riskInterpretation":"This JobPlan should be prioritised for review.",
+    "dataConfidence":"High",
+    "modelRiskComponent":99.6,
+    "ruleRiskComponent":77.0
+  },
+  {
+    "jobPlanCode":"JP-2026-001839",
+    "trustLevelCode":"TLC-ENT",
+    "trust_level_code":"TLC-ENT",
+    "department":"Surgery",
+    "specialty":"ENT",
+    "riskScore":82.6,
+    "riskCategory":"High",
+    "mainDrivers":[
+      "PA limit breach detected against configured trust limits.",
+      "SPA increased by 1.00 PA compared with prior plan.",
+      "DCC reduced by 0.75 PA compared with prior plan."
+    ],
+    "mainDriversText":"PA limit breach detected against configured trust limits. | SPA increased by 1.00 PA compared with prior plan. | DCC reduced by 0.75 PA compared with prior plan.",
+    "recommendedAction":"Immediate Clinical Director review",
+    "riskInterpretation":"This JobPlan should be prioritised for review.",
+    "dataConfidence":"High",
+    "modelRiskComponent":99.6,
+    "ruleRiskComponent":77.1
+  },
+  {
+    "jobPlanCode":"JP-2023-000103",
+    "trustLevelCode":"TLC-GASTRO",
+    "trust_level_code":"TLC-GASTRO",
+    "department":"Medicine",
+    "specialty":"Gastroenterology",
+    "riskScore":82.5,
+    "riskCategory":"High",
+    "mainDrivers":[
+      "PA limit breach detected against configured trust limits.",
+      "High history change count detected (14).",
+      "Historical mediation or appeal signal exists."
+    ],
+    "mainDriversText":"PA limit breach detected against configured trust limits. | High history change count detected (14). | Historical mediation or appeal signal exists.",
+    "recommendedAction":"Immediate Clinical Director review",
+    "riskInterpretation":"This JobPlan should be prioritised for review.",
+    "dataConfidence":"High",
+    "modelRiskComponent":99.6,
+    "ruleRiskComponent":76.5
+  },
+  {
+    "jobPlanCode":"JP-2025-003657",
+    "trustLevelCode":"TLC-RENAL",
+    "trust_level_code":"TLC-RENAL",
+    "department":"Medicine",
+    "specialty":"Renal",
+    "riskScore":80.8,
+    "riskCategory":"High",
+    "mainDrivers":[
+      "SPA increased by 1.25 PA compared with prior plan.",
+      "DCC reduced by 1.00 PA compared with prior plan.",
+      "Team-plan alignment score is low (0.69)."
+    ],
+    "mainDriversText":"SPA increased by 1.25 PA compared with prior plan. | DCC reduced by 1.00 PA compared with prior plan. | Team-plan alignment score is low (0.69).",
+    "recommendedAction":"Immediate Clinical Director review",
+    "riskInterpretation":"This JobPlan should be prioritised for review.",
+    "dataConfidence":"High",
+    "modelRiskComponent":99.6,
+    "ruleRiskComponent":74.7
+  },
+  {
+    "jobPlanCode":"JP-2024-004721",
+    "trustLevelCode":"TLC-RENAL",
+    "trust_level_code":"TLC-RENAL",
+    "department":"Medicine",
+    "specialty":"Renal",
+    "riskScore":80.4,
+    "riskCategory":"High",
+    "mainDrivers":[
+      "PA limit breach detected against configured trust limits.",
+      "High history change count detected (15).",
+      "Historical mediation or appeal signal exists."
+    ],
+    "mainDriversText":"PA limit breach detected against configured trust limits. | High history change count detected (15). | Historical mediation or appeal signal exists.",
+    "recommendedAction":"Immediate Clinical Director review",
+    "riskInterpretation":"This JobPlan should be prioritised for review.",
+    "dataConfidence":"High",
+    "modelRiskComponent":99.6,
+    "ruleRiskComponent":74.2
+  },
+  {
+    "jobPlanCode":"JP-2025-001646",
+    "trustLevelCode":"TLC-DERM",
+    "trust_level_code":"TLC-DERM",
+    "department":"Medicine",
+    "specialty":"Dermatology",
+    "riskScore":79.9,
+    "riskCategory":"High",
+    "mainDrivers":[
+      "SPA increased by 1.50 PA compared with prior plan.",
+      "DCC reduced by 1.25 PA compared with prior plan.",
+      "Team-plan alignment score is low (0.69)."
+    ],
+    "mainDriversText":"SPA increased by 1.50 PA compared with prior plan. | DCC reduced by 1.25 PA compared with prior plan. | Team-plan alignment score is low (0.69).",
+    "recommendedAction":"Immediate Clinical Director review",
+    "riskInterpretation":"This JobPlan should be prioritised for review.",
+    "dataConfidence":"High",
+    "modelRiskComponent":99.6,
+    "ruleRiskComponent":73.2
+  },
+  {
+    "jobPlanCode":"JP-2025-001997",
+    "trustLevelCode":"TLC-RESP",
+    "trust_level_code":"TLC-RESP",
+    "department":"Medicine",
+    "specialty":"Respiratory",
+    "riskScore":79.8,
+    "riskCategory":"High",
+    "mainDrivers":[
+      "PA limit breach detected against configured trust limits.",
+      "SPA increased by 1.25 PA compared with prior plan.",
+      "DCC reduced by 1.50 PA compared with prior plan."
+    ],
+    "mainDriversText":"PA limit breach detected against configured trust limits. | SPA increased by 1.25 PA compared with prior plan. | DCC reduced by 1.50 PA compared with prior plan.",
+    "recommendedAction":"Immediate Clinical Director review",
+    "riskInterpretation":"This JobPlan should be prioritised for review.",
+    "dataConfidence":"High",
+    "modelRiskComponent":99.6,
+    "ruleRiskComponent":73.0
+  },
+  {
+    "jobPlanCode":"JP-2022-003807",
+    "trustLevelCode":"TLC-NEURO",
+    "trust_level_code":"TLC-NEURO",
+    "department":"Medicine",
+    "specialty":"Neurology",
+    "riskScore":79.3,
+    "riskCategory":"High",
+    "mainDrivers":[
+      "SPA increased by 1.50 PA compared with prior plan.",
+      "DCC reduced by 0.75 PA compared with prior plan.",
+      "Team-plan alignment score is low (0.64)."
+    ],
+    "mainDriversText":"SPA increased by 1.50 PA compared with prior plan. | DCC reduced by 0.75 PA compared with prior plan. | Team-plan alignment score is low (0.64).",
+    "recommendedAction":"Immediate Clinical Director review",
+    "riskInterpretation":"This JobPlan should be prioritised for review.",
+    "dataConfidence":"High",
+    "modelRiskComponent":99.6,
+    "ruleRiskComponent":72.5
+  },
+  {
+    "jobPlanCode":"JP-2022-001998",
+    "trustLevelCode":"TLC-RESP",
+    "trust_level_code":"TLC-RESP",
+    "department":"Medicine",
+    "specialty":"Respiratory",
+    "riskScore":79.1,
+    "riskCategory":"High",
+    "mainDrivers":[
+      "PA limit breach detected against configured trust limits.",
+      "SPA increased by 1.25 PA compared with prior plan.",
+      "DCC reduced by 1.25 PA compared with prior plan."
+    ],
+    "mainDriversText":"PA limit breach detected against configured trust limits. | SPA increased by 1.25 PA compared with prior plan. | DCC reduced by 1.25 PA compared with prior plan.",
+    "recommendedAction":"Immediate Clinical Director review",
+    "riskInterpretation":"This JobPlan should be prioritised for review.",
+    "dataConfidence":"High",
+    "modelRiskComponent":99.6,
+    "ruleRiskComponent":72.0
+  },
+  {
+    "jobPlanCode":"JP-2024-003563",
+    "trustLevelCode":"TLC-ENT",
+    "trust_level_code":"TLC-ENT",
+    "department":"Surgery",
+    "specialty":"ENT",
+    "riskScore":78.1,
+    "riskCategory":"High",
+    "mainDrivers":[
+      "SPA increased by 1.25 PA compared with prior plan.",
+      "DCC reduced by 1.25 PA compared with prior plan.",
+      "Team-plan alignment score is low (0.71)."
+    ],
+    "mainDriversText":"SPA increased by 1.25 PA compared with prior plan. | DCC reduced by 1.25 PA compared with prior plan. | Team-plan alignment score is low (0.71).",
+    "recommendedAction":"Immediate Clinical Director review",
+    "riskInterpretation":"This JobPlan should be prioritised for review.",
+    "dataConfidence":"High",
+    "modelRiskComponent":99.6,
+    "ruleRiskComponent":70.9
+  },
+  {
+    "jobPlanCode":"JP-2023-003596",
+    "trustLevelCode":"TLC-ANAES",
+    "trust_level_code":"TLC-ANAES",
+    "department":"Surgery",
+    "specialty":"Anaesthetics",
+    "riskScore":78.1,
+    "riskCategory":"High",
+    "mainDrivers":[
+      "PA limit breach detected against configured trust limits.",
+      "SPA increased by 1.25 PA compared with prior plan.",
+      "DCC reduced by 0.75 PA compared with prior plan."
+    ],
+    "mainDriversText":"PA limit breach detected against configured trust limits. | SPA increased by 1.25 PA compared with prior plan. | DCC reduced by 0.75 PA compared with prior plan.",
+    "recommendedAction":"Immediate Clinical Director review",
+    "riskInterpretation":"This JobPlan should be prioritised for review.",
+    "dataConfidence":"High",
+    "modelRiskComponent":99.6,
+    "ruleRiskComponent":71.0
+  },
+  {
+    "jobPlanCode":"JP-2026-003006",
+    "trustLevelCode":"TLC-ONC",
+    "trust_level_code":"TLC-ONC",
+    "department":"Medicine",
+    "specialty":"Oncology",
+    "riskScore":78.0,
+    "riskCategory":"High",
+    "mainDrivers":[
+      "SPA increased by 1.50 PA compared with prior plan.",
+      "DCC reduced by 0.75 PA compared with prior plan.",
+      "Team-plan alignment score is low (0.63)."
+    ],
+    "mainDriversText":"SPA increased by 1.50 PA compared with prior plan. | DCC reduced by 0.75 PA compared with prior plan. | Team-plan alignment score is low (0.63).",
+    "recommendedAction":"Immediate Clinical Director review",
+    "riskInterpretation":"This JobPlan should be prioritised for review.",
+    "dataConfidence":"High",
+    "modelRiskComponent":99.6,
+    "ruleRiskComponent":70.6
+  },
+  {
+    "jobPlanCode":"JP-2026-003007",
+    "trustLevelCode":"TLC-ENT",
+    "trust_level_code":"TLC-ENT",
+    "department":"Surgery",
+    "specialty":"ENT",
+    "riskScore":77.7,
+    "riskCategory":"High",
+    "mainDrivers":[
+      "SPA increased by 1.50 PA compared with prior plan.",
+      "DCC reduced by 0.75 PA compared with prior plan.",
+      "Team-plan alignment score is low (0.69)."
+    ],
+    "mainDriversText":"SPA increased by 1.50 PA compared with prior plan. | DCC reduced by 0.75 PA compared with prior plan. | Team-plan alignment score is low (0.69).",
+    "recommendedAction":"Immediate Clinical Director review",
+    "riskInterpretation":"This JobPlan should be prioritised for review.",
+    "dataConfidence":"High",
+    "modelRiskComponent":99.6,
+    "ruleRiskComponent":70.1
+  },
+  {
+    "jobPlanCode":"JP-2026-001393",
+    "trustLevelCode":"TLC-RESP",
+    "trust_level_code":"TLC-RESP",
+    "department":"Medicine",
+    "specialty":"Respiratory",
+    "riskScore":77.5,
+    "riskCategory":"High",
+    "mainDrivers":[
+      "PA limit breach detected against configured trust limits.",
+      "SPA increased by 1.00 PA compared with prior plan.",
+      "DCC reduced by 1.00 PA compared with prior plan."
+    ],
+    "mainDriversText":"PA limit breach detected against configured trust limits. | SPA increased by 1.00 PA compared with prior plan. | DCC reduced by 1.00 PA compared with prior plan.",
+    "recommendedAction":"Immediate Clinical Director review",
+    "riskInterpretation":"This JobPlan should be prioritised for review.",
+    "dataConfidence":"High",
+    "modelRiskComponent":99.6,
+    "ruleRiskComponent":70.0
+  },
+  {
+    "jobPlanCode":"JP-2023-002366",
+    "trustLevelCode":"TLC-GASTRO",
+    "trust_level_code":"TLC-GASTRO",
+    "department":"Medicine",
+    "specialty":"Gastroenterology",
+    "riskScore":77.4,
+    "riskCategory":"High",
+    "mainDrivers":[
+      "SPA increased by 1.25 PA compared with prior plan.",
+      "DCC reduced by 1.25 PA compared with prior plan.",
+      "High history change count detected (24)."
+    ],
+    "mainDriversText":"SPA increased by 1.25 PA compared with prior plan. | DCC reduced by 1.25 PA compared with prior plan. | High history change count detected (24).",
+    "recommendedAction":"Immediate Clinical Director review",
+    "riskInterpretation":"This JobPlan should be prioritised for review.",
+    "dataConfidence":"High",
+    "modelRiskComponent":99.6,
+    "ruleRiskComponent":70.0
+  },
+  {
+    "jobPlanCode":"JP-2026-000425",
+    "trustLevelCode":"TLC-GASTRO",
+    "trust_level_code":"TLC-GASTRO",
+    "department":"Medicine",
+    "specialty":"Gastroenterology",
+    "riskScore":76.9,
+    "riskCategory":"High",
+    "mainDrivers":[
+      "PA limit breach detected against configured trust limits.",
+      "SPA increased by 1.25 PA compared with prior plan.",
+      "DCC reduced by 1.25 PA compared with prior plan."
+    ],
+    "mainDriversText":"PA limit breach detected against configured trust limits. | SPA increased by 1.25 PA compared with prior plan. | DCC reduced by 1.25 PA compared with prior plan.",
+    "recommendedAction":"Immediate Clinical Director review",
+    "riskInterpretation":"This JobPlan should be prioritised for review.",
+    "dataConfidence":"High",
+    "modelRiskComponent":99.6,
+    "ruleRiskComponent":69.6
+  },
+  {
+    "jobPlanCode":"JP-2026-004271",
+    "trustLevelCode":"TLC-DERM",
+    "trust_level_code":"TLC-DERM",
+    "department":"Medicine",
+    "specialty":"Dermatology",
+    "riskScore":76.6,
+    "riskCategory":"High",
+    "mainDrivers":[
+      "SPA increased by 1.00 PA compared with prior plan.",
+      "DCC reduced by 1.25 PA compared with prior plan.",
+      "High history change count detected (16)."
+    ],
+    "mainDriversText":"SPA increased by 1.00 PA compared with prior plan. | DCC reduced by 1.25 PA compared with prior plan. | High history change count detected (16).",
+    "recommendedAction":"Immediate Clinical Director review",
+    "riskInterpretation":"This JobPlan should be prioritised for review.",
+    "dataConfidence":"High",
+    "modelRiskComponent":99.6,
+    "ruleRiskComponent":69.0
+  },
+  {
+    "jobPlanCode":"JP-2026-004808",
+    "trustLevelCode":"TLC-DERM",
+    "trust_level_code":"TLC-DERM",
+    "department":"Medicine",
+    "specialty":"Dermatology",
+    "riskScore":76.5,
+    "riskCategory":"High",
+    "mainDrivers":[
+      "SPA increased by 1.50 PA compared with prior plan.",
+      "DCC reduced by 1.00 PA compared with prior plan.",
+      "Team-plan alignment score is low (0.60)."
+    ],
+    "mainDriversText":"SPA increased by 1.50 PA compared with prior plan. | DCC reduced by 1.00 PA compared with prior plan. | Team-plan alignment score is low (0.60).",
+    "recommendedAction":"Immediate Clinical Director review",
+    "riskInterpretation":"This JobPlan should be prioritised for review.",
+    "dataConfidence":"High",
+    "modelRiskComponent":99.6,
+    "ruleRiskComponent":69.0
+  },
+  {
+    "jobPlanCode":"JP-2026-004076",
+    "trustLevelCode":"TLC-ORTH",
+    "trust_level_code":"TLC-ORTH",
+    "department":"Surgery",
+    "specialty":"Orthopaedics",
+    "riskScore":76.0,
+    "riskCategory":"High",
+    "mainDrivers":[
+      "PA limit breach detected against configured trust limits.",
+      "SPA increased by 1.00 PA compared with prior plan.",
+      "DCC reduced by 1.25 PA compared with prior plan."
+    ],
+    "mainDriversText":"PA limit breach detected against configured trust limits. | SPA increased by 1.00 PA compared with prior plan. | DCC reduced by 1.25 PA compared with prior plan.",
+    "recommendedAction":"Immediate Clinical Director review",
+    "riskInterpretation":"This JobPlan should be prioritised for review.",
+    "dataConfidence":"High",
+    "modelRiskComponent":99.6,
+    "ruleRiskComponent":68.0
+  },
+  {
+    "jobPlanCode":"JP-2025-002528",
+    "trustLevelCode":"TLC-ANAES",
+    "trust_level_code":"TLC-ANAES",
+    "department":"Surgery",
+    "specialty":"Anaesthetics",
+    "riskScore":76.0,
+    "riskCategory":"High",
+    "mainDrivers":[
+      "PA limit breach detected against configured trust limits.",
+      "SPA increased by 1.50 PA compared with prior plan.",
+      "DCC reduced by 1.25 PA compared with prior plan."
+    ],
+    "mainDriversText":"PA limit breach detected against configured trust limits. | SPA increased by 1.50 PA compared with prior plan. | DCC reduced by 1.25 PA compared with prior plan.",
+    "recommendedAction":"Immediate Clinical Director review",
+    "riskInterpretation":"This JobPlan should be prioritised for review.",
+    "dataConfidence":"High",
+    "modelRiskComponent":99.6,
+    "ruleRiskComponent":68.0
+  },
+  {
+    "jobPlanCode":"JP-2024-000488",
+    "trustLevelCode":"TLC-NEURO",
+    "trust_level_code":"TLC-NEURO",
+    "department":"Medicine",
+    "specialty":"Neurology",
+    "riskScore":75.9,
+    "riskCategory":"High",
+    "mainDrivers":[
+      "PA limit breach detected against configured trust limits.",
+      "SPA increased by 1.50 PA compared with prior plan.",
+      "DCC reduced by 1.25 PA compared with prior plan."
+    ],
+    "mainDriversText":"PA limit breach detected against configured trust limits. | SPA increased by 1.50 PA compared with prior plan. | DCC reduced by 1.25 PA compared with prior plan.",
+    "recommendedAction":"Immediate Clinical Director review",
+    "riskInterpretation":"This JobPlan should be prioritised for review.",
+    "dataConfidence":"High",
+    "modelRiskComponent":99.6,
+    "ruleRiskComponent":68.2
+  },
+  {
+    "jobPlanCode":"JP-2024-004824",
+    "trustLevelCode":"TLC-ENT",
+    "trust_level_code":"TLC-ENT",
+    "department":"Surgery",
+    "specialty":"ENT",
+    "riskScore":75.8,
+    "riskCategory":"High",
+    "mainDrivers":[
+      "SPA increased by 1.00 PA compared with prior plan.",
+      "DCC reduced by 1.25 PA compared with prior plan.",
+      "Team-plan alignment score is low (0.70)."
+    ],
+    "mainDriversText":"SPA increased by 1.00 PA compared with prior plan. | DCC reduced by 1.25 PA compared with prior plan. | Team-plan alignment score is low (0.70).",
+    "recommendedAction":"Immediate Clinical Director review",
+    "riskInterpretation":"This JobPlan should be prioritised for review.",
+    "dataConfidence":"High",
+    "modelRiskComponent":99.6,
+    "ruleRiskComponent":67.8
+  },
+  {
+    "jobPlanCode":"JP-2025-000380",
+    "trustLevelCode":"TLC-NEURO",
+    "trust_level_code":"TLC-NEURO",
+    "department":"Medicine",
+    "specialty":"Neurology",
+    "riskScore":75.6,
+    "riskCategory":"High",
+    "mainDrivers":[
+      "SPA increased by 1.50 PA compared with prior plan.",
+      "DCC reduced by 1.00 PA compared with prior plan.",
+      "Team-plan alignment score is low (0.75)."
+    ],
+    "mainDriversText":"SPA increased by 1.50 PA compared with prior plan. | DCC reduced by 1.00 PA compared with prior plan. | Team-plan alignment score is low (0.75).",
+    "recommendedAction":"Immediate Clinical Director review",
+    "riskInterpretation":"This JobPlan should be prioritised for review.",
+    "dataConfidence":"High",
+    "modelRiskComponent":99.6,
+    "ruleRiskComponent":67.3
+  },
+  {
+    "jobPlanCode":"JP-2024-001409",
+    "trustLevelCode":"TLC-GASTRO",
+    "trust_level_code":"TLC-GASTRO",
+    "department":"Medicine",
+    "specialty":"Gastroenterology",
+    "riskScore":75.3,
+    "riskCategory":"High",
+    "mainDrivers":[
+      "SPA increased by 1.00 PA compared with prior plan.",
+      "DCC reduced by 1.25 PA compared with prior plan.",
+      "Team-plan alignment score is low (0.73)."
+    ],
+    "mainDriversText":"SPA increased by 1.00 PA compared with prior plan. | DCC reduced by 1.25 PA compared with prior plan. | Team-plan alignment score is low (0.73).",
+    "recommendedAction":"Immediate Clinical Director review",
+    "riskInterpretation":"This JobPlan should be prioritised for review.",
+    "dataConfidence":"High",
+    "modelRiskComponent":99.6,
+    "ruleRiskComponent":67.4
+  },
+  {
+    "jobPlanCode":"JP-2023-000859",
+    "trustLevelCode":"TLC-RENAL",
+    "trust_level_code":"TLC-RENAL",
+    "department":"Medicine",
+    "specialty":"Renal",
+    "riskScore":75.2,
+    "riskCategory":"High",
+    "mainDrivers":[
+      "PA limit breach detected against configured trust limits.",
+      "SPA increased by 1.25 PA compared with prior plan.",
+      "Team-plan alignment score is low (0.70)."
+    ],
+    "mainDriversText":"PA limit breach detected against configured trust limits. | SPA increased by 1.25 PA compared with prior plan. | Team-plan alignment score is low (0.70).",
+    "recommendedAction":"Immediate Clinical Director review",
+    "riskInterpretation":"This JobPlan should be prioritised for review.",
+    "dataConfidence":"High",
+    "modelRiskComponent":99.6,
+    "ruleRiskComponent":67.2
+  },
+  {
+    "jobPlanCode":"JP-2024-002898",
+    "trustLevelCode":"TLC-ENT",
+    "trust_level_code":"TLC-ENT",
+    "department":"Surgery",
+    "specialty":"ENT",
+    "riskScore":75.2,
+    "riskCategory":"High",
+    "mainDrivers":[
+      "SPA increased by 1.25 PA compared with prior plan.",
+      "DCC reduced by 1.25 PA compared with prior plan.",
+      "Team-plan alignment score is low (0.65)."
+    ],
+    "mainDriversText":"SPA increased by 1.25 PA compared with prior plan. | DCC reduced by 1.25 PA compared with prior plan. | Team-plan alignment score is low (0.65).",
+    "recommendedAction":"Immediate Clinical Director review",
+    "riskInterpretation":"This JobPlan should be prioritised for review.",
+    "dataConfidence":"High",
+    "modelRiskComponent":99.6,
+    "ruleRiskComponent":66.8
+  },
+  {
+    "jobPlanCode":"JP-2024-002680",
+    "trustLevelCode":"TLC-ANAES",
+    "trust_level_code":"TLC-ANAES",
+    "department":"Surgery",
+    "specialty":"Anaesthetics",
+    "riskScore":75.1,
+    "riskCategory":"High",
+    "mainDrivers":[
+      "SPA increased by 1.50 PA compared with prior plan.",
+      "DCC reduced by 1.25 PA compared with prior plan.",
+      "High history change count detected (19)."
+    ],
+    "mainDriversText":"SPA increased by 1.50 PA compared with prior plan. | DCC reduced by 1.25 PA compared with prior plan. | High history change count detected (19).",
+    "recommendedAction":"Immediate Clinical Director review",
+    "riskInterpretation":"This JobPlan should be prioritised for review.",
+    "dataConfidence":"High",
+    "modelRiskComponent":99.6,
+    "ruleRiskComponent":67.0
+  },
+  {
+    "jobPlanCode":"JP-2026-003087",
+    "trustLevelCode":"TLC-RENAL",
+    "trust_level_code":"TLC-RENAL",
+    "department":"Medicine",
+    "specialty":"Renal",
+    "riskScore":75.1,
+    "riskCategory":"High",
+    "mainDrivers":[
+      "SPA increased by 1.25 PA compared with prior plan.",
+      "DCC reduced by 1.25 PA compared with prior plan.",
+      "Team-plan alignment score is low (0.60)."
+    ],
+    "mainDriversText":"SPA increased by 1.25 PA compared with prior plan. | DCC reduced by 1.25 PA compared with prior plan. | Team-plan alignment score is low (0.60).",
+    "recommendedAction":"Immediate Clinical Director review",
+    "riskInterpretation":"This JobPlan should be prioritised for review.",
+    "dataConfidence":"High",
+    "modelRiskComponent":99.6,
+    "ruleRiskComponent":66.6
+  }
+]

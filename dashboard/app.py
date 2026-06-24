@@ -1,149 +1,51 @@
 from __future__ import annotations
 
-import json
+import ast
 import html
+import json
+import sys
 from pathlib import Path
+from typing import Any
 
-import numpy as np
 import pandas as pd
 import streamlit as st
-import streamlit.components.v1 as components
-import plotly.express as px
-from sklearn.ensemble import HistGradientBoostingClassifier
-from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import (
-    accuracy_score,
-    average_precision_score,
-    classification_report,
-    confusion_matrix,
-    f1_score,
-    precision_score,
-    recall_score,
-    roc_auc_score,
-)
-from sklearn.model_selection import train_test_split
-from sklearn.pipeline import Pipeline
-
-from jobplan_risk.features import MODEL_FEATURES, prepare_features
-from jobplan_risk.labels import build_pseudo_labels
-from jobplan_risk.score import score
-from jobplan_risk.train import build_preprocessor, train
 
 
-DATA_PATH = Path("data/staging_plan_features.csv")
-MODEL_DIR = Path("models")
-OUTPUT_DIR = Path("outputs")
+ROOT = Path(".")
+DATA_PATH = ROOT / "data" / "staging_plan_features.csv"
+MODEL_DIR = ROOT / "models"
+OUTPUT_DIR = ROOT / "outputs"
+RISK_SCORES_PATH = OUTPUT_DIR / "risk_scores.csv"
+HIGH_RISK_JSON_PATH = OUTPUT_DIR / "high_risk_jobplans.json"
+HIGH_RISK_CSV_PATH = OUTPUT_DIR / "high_risk_jobplans.csv"
 
-GREEN_SEQUENCE = [
-    "#063B2E",
-    "#0B6F4F",
-    "#009B77",
-    "#59C29E",
-    "#A6E3CC",
-    "#DDF4EA",
-]
+sys.path.insert(0, str(ROOT / "src"))
 
-RISK_COLOR_MAP = {
-    "High": "#B3261E",
-    "Medium": "#B06000",
-    "Low": "#0B6F4F",
+
+TRUST_CONTEXT = {
+    "TLC-ONC": ("Medicine", "Oncology"),
+    "TLC-CARD": ("Medicine", "Cardiology"),
+    "TLC-GASTRO": ("Medicine", "Gastroenterology"),
+    "TLC-RESP": ("Medicine", "Respiratory"),
+    "TLC-UROL": ("Surgery", "Urology"),
+    "TLC-ENT": ("Surgery", "ENT"),
+    "TLC-TNO": ("Surgery", "Trauma & Orthopaedics"),
+    "TLC-RAD": ("Diagnostics", "Radiology"),
+    "TLC-PAED": ("Women & Children", "Paediatrics"),
+    "TLC-ED": ("Emergency", "Emergency Medicine"),
 }
 
 
-def apply_plotly_theme(fig):
-    fig.update_layout(
-        paper_bgcolor="#FFFFFF",
-        plot_bgcolor="#FFFFFF",
-        font=dict(color="#102A21", size=13),
-        title=dict(font=dict(color="#063B2E", size=18)),
-        legend=dict(
-            font=dict(color="#102A21"),
-            bgcolor="rgba(255,255,255,0)",
-        ),
-        margin=dict(l=20, r=20, t=55, b=30),
-        colorway=GREEN_SEQUENCE,
-    )
-    fig.update_xaxes(
-        color="#102A21",
-        gridcolor="#E6F4EE",
-        linecolor="#CFE7DC",
-        zerolinecolor="#CFE7DC",
-    )
-    fig.update_yaxes(
-        color="#102A21",
-        gridcolor="#E6F4EE",
-        linecolor="#CFE7DC",
-        zerolinecolor="#CFE7DC",
-    )
-    return fig
-
-
-def plot_green_bar(series, title, value_label="Value", horizontal=False):
-    data = series.reset_index()
-    data.columns = ["Category", value_label]
-
-    fig = px.bar(
-        data,
-        x=value_label if horizontal else "Category",
-        y="Category" if horizontal else value_label,
-        orientation="h" if horizontal else "v",
-        color_discrete_sequence=["#0B6F4F"],
-        text=value_label,
-    )
-    fig.update_traces(
-        marker_color="#0B6F4F",
-        textposition="outside",
-        hovertemplate="<b>%{x}</b><br>%{y}<extra></extra>" if horizontal else "<b>%{x}</b><br>%{y}<extra></extra>",
-    )
-    fig.update_layout(title=title, showlegend=False)
-    apply_plotly_theme(fig)
-    st.plotly_chart(fig, use_container_width=True)
-
-
-def plot_risk_distribution(series, title="Risk Category Distribution"):
-    order = ["High", "Medium", "Low"]
-    data = series.reindex(order).fillna(0).reset_index()
-    data.columns = ["Risk Category", "Plans"]
-
-    fig = px.bar(
-        data,
-        x="Risk Category",
-        y="Plans",
-        color="Risk Category",
-        color_discrete_map=RISK_COLOR_MAP,
-        text="Plans",
-    )
-    fig.update_traces(textposition="outside")
-    fig.update_layout(title=title, showlegend=False)
-    apply_plotly_theme(fig)
-    st.plotly_chart(fig, use_container_width=True)
-
-
-def plot_green_pie(series, title):
-    data = series.reset_index()
-    data.columns = ["Category", "Value"]
-
-    fig = px.pie(
-        data,
-        names="Category",
-        values="Value",
-        color_discrete_sequence=GREEN_SEQUENCE,
-        hole=0.45,
-    )
-    fig.update_traces(
-        textinfo="label+percent",
-        textfont_color="#102A21",
-        marker=dict(line=dict(color="#FFFFFF", width=2)),
-    )
-    fig.update_layout(title=title)
-    apply_plotly_theme(fig)
-    st.plotly_chart(fig, use_container_width=True)
-
+MODEL_DISPLAY_NAMES = {
+    "hist_gradient_boosting": "Histogram-based Gradient Boosting",
+    "logistic_regression": "Logistic Regression",
+    "isolation_forest": "Isolation Forest",
+}
 
 
 st.set_page_config(
-    page_title="AI JobPlan Risk Dashboard",
-    page_icon="🚦",
+    page_title="JobPlan ML Risk Layer",
+    page_icon="🧠",
     layout="wide",
 )
 
@@ -151,417 +53,287 @@ st.set_page_config(
 st.markdown(
     """
     <style>
-    :root {
-        --rld-green-dark: #063B2E;
-        --rld-green: #0B6F4F;
-        --rld-green-bright: #009B77;
-        --rld-green-soft: #E6F4EE;
-        --rld-green-pale: #F6FAF8;
-        --rld-border: #CFE7DC;
-        --rld-text: #102A21;
-        --rld-muted: #52635C;
-        --rld-white: #FFFFFF;
-        --rld-red: #B3261E;
-        --rld-amber: #B06000;
-        --rld-shadow: rgba(6, 59, 46, 0.12);
-    }
+        .stApp {
+            background: #F5FAF7;
+            color: #000000 !important;
+        }
 
-    html, body, .stApp {
-        background: var(--rld-green-pale) !important;
-        color: var(--rld-text) !important;
-    }
+        h1, h2, h3, h4, h5, h6, p, span, div, label {
+            color: #000000;
+        }
 
-    .block-container {
-        padding-top: 1.4rem !important;
-        padding-bottom: 3rem !important;
-    }
+        .main-title {
+            font-size: 36px;
+            font-weight: 950;
+            color: #063B2E !important;
+            margin-bottom: 4px;
+        }
 
-    h1, h2, h3, h4, h5, h6, p, span, div, label {
-        color: var(--rld-text);
-    }
+        .main-subtitle {
+            font-size: 17px;
+            color: #102A21 !important;
+            margin-bottom: 18px;
+        }
 
-    .brand-header {
-        padding: 22px 26px;
-        border-radius: 22px;
-        background: linear-gradient(135deg, var(--rld-green-dark) 0%, var(--rld-green) 52%, var(--rld-green-bright) 100%);
-        color: var(--rld-white) !important;
-        margin-bottom: 22px;
-        box-shadow: 0 10px 28px var(--rld-shadow);
-    }
+        .hero-box {
+            background: #FFFFFF;
+            border: 2px solid #CFE7DC;
+            border-left: 8px solid #0B6F4F;
+            border-radius: 18px;
+            padding: 18px 20px;
+            margin: 12px 0 18px 0;
+            box-shadow: 0 6px 18px rgba(6, 59, 46, 0.08);
+        }
 
-    .brand-header * {
-        color: var(--rld-white) !important;
-    }
+        .hero-title {
+            font-size: 22px;
+            font-weight: 900;
+            color: #063B2E !important;
+            margin-bottom: 8px;
+        }
 
-    .brand-logo {
-        font-size: 18px;
-        font-weight: 850;
-        letter-spacing: .02em;
-        margin-bottom: 8px;
-    }
+        .hero-text {
+            font-size: 15px;
+            line-height: 1.55;
+            color: #102A21 !important;
+        }
 
-    .brand-title {
-        font-size: 36px;
-        font-weight: 900;
-        line-height: 1.1;
-        margin-bottom: 6px;
-    }
+        .metric-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 12px;
+            margin: 14px 0 20px 0;
+        }
 
-    .brand-subtitle {
-        font-size: 17px;
-        opacity: 0.94;
-    }
+        .metric-card {
+            background: #FFFFFF;
+            border: 1px solid #D8E7DF;
+            border-radius: 16px;
+            padding: 16px;
+            box-shadow: 0 4px 14px rgba(6, 59, 46, 0.06);
+        }
 
-    .hero-box {
-        padding: 22px;
-        border-radius: 20px;
-        background: var(--rld-white);
-        color: var(--rld-text) !important;
-        border: 1px solid var(--rld-border);
-        margin-bottom: 18px;
-        box-shadow: 0 5px 18px var(--rld-shadow);
-    }
+        .metric-label {
+            font-size: 12px;
+            font-weight: 850;
+            color: #0B6F4F !important;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            margin-bottom: 6px;
+        }
 
-    .hero-box * {
-        color: var(--rld-text) !important;
-    }
+        .metric-value {
+            font-size: 26px;
+            font-weight: 950;
+            color: #000000 !important;
+        }
 
-    .section-box {
-        padding: 18px;
-        border-radius: 18px;
-        background: var(--rld-white);
-        color: var(--rld-text) !important;
-        border: 1px solid var(--rld-border);
-        box-shadow: 0 4px 14px var(--rld-shadow);
-        margin-bottom: 16px;
-    }
+        .metric-help {
+            font-size: 12px;
+            color: #102A21 !important;
+            margin-top: 4px;
+        }
 
-    .risk-card {
-        padding: 20px;
-        border-radius: 18px;
-        border: 1px solid var(--rld-border);
-        background: var(--rld-white);
-        color: var(--rld-text) !important;
-        box-shadow: 0 5px 18px var(--rld-shadow);
-        margin-bottom: 16px;
-    }
+        .risk-card {
+            background: #FFFFFF;
+            border: 2px solid #CFE7DC;
+            border-radius: 18px;
+            padding: 16px 18px;
+            margin-bottom: 14px;
+            box-shadow: 0 6px 18px rgba(6, 59, 46, 0.08);
+            min-height: 285px;
+        }
 
-    .risk-card * {
-        color: var(--rld-text) !important;
-    }
+        .risk-card-high {
+            border-left: 8px solid #B42318;
+        }
 
-    .risk-high {
-        border-left: 12px solid var(--rld-red);
-    }
+        .risk-card-medium {
+            border-left: 8px solid #F97316;
+        }
 
-    .risk-medium {
-        border-left: 12px solid var(--rld-amber);
-    }
+        .risk-card-low {
+            border-left: 8px solid #EAB308;
+        }
 
-    .risk-low {
-        border-left: 12px solid var(--rld-green-bright);
-    }
+        .risk-title {
+            font-size: 19px;
+            font-weight: 950;
+            color: #063B2E !important;
+            margin-bottom: 4px;
+        }
 
-    .big-number {
-        font-size: 36px;
-        font-weight: 900;
-        color: var(--rld-green-dark) !important;
-    }
+        .risk-context {
+            font-size: 13px;
+            color: #102A21 !important;
+            margin-bottom: 4px;
+        }
 
-    .small-label {
-        font-size: 12px;
-        color: var(--rld-muted) !important;
-        text-transform: uppercase;
-        letter-spacing: .05em;
-        font-weight: 700;
-    }
+        .risk-score {
+            font-size: 34px;
+            font-weight: 950;
+            margin: 8px 0;
+        }
 
-    .driver {
-        font-size: 14px;
-        margin-top: 6px;
-        color: var(--rld-text) !important;
-    }
+        .risk-pill {
+            display: inline-block;
+            border-radius: 999px;
+            padding: 5px 10px;
+            font-size: 12px;
+            font-weight: 850;
+            color: #FFFFFF !important;
+            background: #B42318;
+        }
 
-    .nhs-action {
-        font-size: 15px;
-        font-weight: 750;
-        margin-top: 10px;
-        color: var(--rld-green-dark) !important;
-    }
+        .driver-list {
+            margin-top: 10px;
+            padding-left: 18px;
+            font-size: 13px;
+            line-height: 1.45;
+        }
 
-    .urgent {
-        color: var(--rld-red) !important;
-        font-weight: 900;
-    }
+        .action-box {
+            background: #F7FCFA;
+            border: 1px solid #D8E7DF;
+            border-radius: 12px;
+            padding: 10px;
+            margin-top: 10px;
+            font-size: 13px;
+            font-weight: 700;
+            color: #102A21 !important;
+        }
 
-    .medium {
-        color: var(--rld-amber) !important;
-        font-weight: 900;
-    }
+        .light-box {
+            background: #FFFFFF;
+            border: 2px solid #CFE7DC;
+            border-left: 8px solid #0B6F4F;
+            border-radius: 18px;
+            padding: 16px 18px;
+            margin: 12px 0 18px 0;
+            color: #000000 !important;
+            box-shadow: 0 6px 18px rgba(6, 59, 46, 0.08);
+        }
 
-    .good {
-        color: var(--rld-green) !important;
-        font-weight: 900;
-    }
+        .light-line {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+            font-size: 14px;
+            background: #F7FCFA;
+            border: 1px solid #D8E7DF;
+            border-radius: 10px;
+            padding: 8px 10px;
+            margin: 6px 0;
+            color: #000000 !important;
+        }
 
-    .note-box {
-        padding: 16px;
-        border-radius: 16px;
-        background: var(--rld-green-soft);
-        color: var(--rld-text) !important;
-        border: 1px solid var(--rld-border);
-    }
+        .chip {
+            display: inline-block;
+            background: #F3FAF6;
+            border: 1px solid #CFE7DC;
+            color: #000000 !important;
+            border-radius: 999px;
+            padding: 7px 12px;
+            margin: 4px 6px 4px 0;
+            font-size: 13px;
+            font-weight: 750;
+        }
 
-    .note-box * {
-        color: var(--rld-text) !important;
-    }
+        .flow-step {
+            background: #F3FAF6;
+            border: 1px solid #CFE7DC;
+            border-radius: 14px;
+            padding: 12px;
+            margin-bottom: 10px;
+            font-weight: 800;
+            color: #063B2E !important;
+            text-align: center;
+        }
 
-    /* Metric cards */
-    [data-testid="stMetric"] {
-        background: var(--rld-white);
-        border: 1px solid var(--rld-border);
-        border-radius: 18px;
-        padding: 16px;
-        box-shadow: 0 4px 14px var(--rld-shadow);
-    }
+        .flow-arrow {
+            text-align: center;
+            font-size: 22px;
+            font-weight: 900;
+            color: #0B6F4F !important;
+            margin: 2px 0 8px 0;
+        }
 
-    [data-testid="stMetric"] * {
-        color: var(--rld-text) !important;
-    }
+        .endpoint-row {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            background: #F7FCFA;
+            border: 1px solid #D8E7DF;
+            border-radius: 10px;
+            padding: 8px 10px;
+            margin: 6px 0;
+            color: #000000 !important;
+        }
 
-    [data-testid="stMetricValue"] {
-        color: var(--rld-green-dark) !important;
-        font-weight: 900 !important;
-    }
+        .method-badge {
+            min-width: 54px;
+            text-align: center;
+            padding: 4px 8px;
+            border-radius: 999px;
+            background: #0B6F4F;
+            color: #FFFFFF !important;
+            font-size: 12px;
+            font-weight: 850;
+        }
 
-    [data-testid="stMetricDelta"] {
-        color: var(--rld-green) !important;
-    }
+        .endpoint-path {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+            color: #000000 !important;
+            font-size: 14px;
+        }
 
-    /* Tabs */
-    button[data-baseweb="tab"] {
-        background: var(--rld-white) !important;
-        border-radius: 14px 14px 0 0 !important;
-        border: 1px solid var(--rld-border) !important;
-        margin-right: 4px !important;
-        padding: 10px 16px !important;
-    }
+        textarea,
+        div[data-testid="stTextArea"] textarea,
+        div[data-testid="stTextArea"] textarea:disabled,
+        div[data-testid="stTextArea"] textarea[disabled] {
+            background-color: #FFFFFF !important;
+            color: #000000 !important;
+            -webkit-text-fill-color: #000000 !important;
+            opacity: 1 !important;
+            caret-color: #000000 !important;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace !important;
+            font-size: 13px !important;
+            line-height: 1.45 !important;
+            border: 2px solid #CFE7DC !important;
+            border-radius: 12px !important;
+        }
 
-    button[data-baseweb="tab"] p {
-        color: var(--rld-green-dark) !important;
-        font-weight: 800 !important;
-    }
-
-    button[data-baseweb="tab"][aria-selected="true"] {
-        background: var(--rld-green) !important;
-    }
-
-    button[data-baseweb="tab"][aria-selected="true"] p {
-        color: var(--rld-white) !important;
-    }
-
-    /* Sidebar and filters */
-    section[data-testid="stSidebar"] {
-        background: var(--rld-green-soft) !important;
-        color: var(--rld-text) !important;
-    }
-
-    section[data-testid="stSidebar"] * {
-        color: var(--rld-text) !important;
-    }
-
-    /* Inputs/selects */
-    div[data-baseweb="select"] > div,
-    div[data-baseweb="input"] > div,
-    textarea {
-        background: var(--rld-white) !important;
-        color: var(--rld-text) !important;
-        border-color: var(--rld-border) !important;
-    }
-
-    div[data-baseweb="select"] span,
-    div[data-baseweb="select"] div,
-    input,
-    textarea {
-        color: var(--rld-text) !important;
-    }
-
-    /* Dataframes */
-    [data-testid="stDataFrame"] {
-        background: var(--rld-white) !important;
-        border: 1px solid var(--rld-border) !important;
-        border-radius: 14px !important;
-        padding: 6px !important;
-    }
-
-    /* Download buttons and standard buttons */
-    .stDownloadButton button,
-    .stButton button {
-        background: var(--rld-green) !important;
-        color: var(--rld-white) !important;
-        border-radius: 12px !important;
-        border: 1px solid var(--rld-green-dark) !important;
-        font-weight: 800 !important;
-    }
-
-    .stDownloadButton button:hover,
-    .stButton button:hover {
-        background: var(--rld-green-dark) !important;
-        color: var(--rld-white) !important;
-    }
-
-    /* Info/success/warning boxes readability */
-    [data-testid="stAlert"] {
-        background: var(--rld-white) !important;
-        color: var(--rld-text) !important;
-        border: 1px solid var(--rld-border) !important;
-        border-radius: 14px !important;
-    }
-
-    [data-testid="stAlert"] * {
-        color: var(--rld-text) !important;
-    }
-
-    hr {
-        border-color: var(--rld-border) !important;
-    }
+        div[data-testid="stTextArea"] label,
+        div[data-testid="stTextArea"] label p {
+            color: #063B2E !important;
+            font-weight: 850 !important;
+            font-size: 16px !important;
+        }
     
-    /* Force filters/multiselect chips into RLDatix green instead of red */
-    [data-baseweb="tag"] {
-        background-color: #0B6F4F !important;
-        border: 1px solid #063B2E !important;
-        color: #FFFFFF !important;
-    }
+        .risk-score-high {
+            color: #B42318 !important;
+        }
 
-    [data-baseweb="tag"] * {
-        color: #FFFFFF !important;
-    }
+        .risk-score-medium {
+            color: #F97316 !important;
+        }
 
-    [data-baseweb="tag"] svg {
-        fill: #FFFFFF !important;
-    }
+        .risk-score-low {
+            color: #EAB308 !important;
+        }
 
-    /* Dropdown selected values */
-    div[data-baseweb="select"] {
-        background-color: #FFFFFF !important;
-        color: #102A21 !important;
-    }
+        .risk-pill-high {
+            background: #B42318 !important;
+            color: #FFFFFF !important;
+        }
 
-    div[data-baseweb="select"] * {
-        color: #102A21 !important;
-    }
+        .risk-pill-medium {
+            background: #F97316 !important;
+            color: #000000 !important;
+        }
 
-    /* Checkbox and slider accent colours */
-    input[type="checkbox"]:checked {
-        accent-color: #0B6F4F !important;
-    }
-
-    .stSlider [data-baseweb="slider"] div {
-        color: #0B6F4F !important;
-    }
-
-    .stSlider [role="slider"] {
-        background-color: #0B6F4F !important;
-        border-color: #063B2E !important;
-    }
-
-    /* Plotly chart surface */
-    .js-plotly-plot,
-    .plot-container,
-    .svg-container {
-        background: #FFFFFF !important;
-        color: #102A21 !important;
-        border-radius: 16px !important;
-    }
-
-    .js-plotly-plot text {
-        fill: #102A21 !important;
-    }
-
-    
-    /* Compact Highest-Risk JobPlan cards */
-    .compact-risk-card {
-        background: #FFFFFF;
-        border: 1px solid #D8E7DF;
-        border-left: 8px solid #B3261E;
-        border-radius: 16px;
-        padding: 16px 18px;
-        margin-bottom: 16px;
-        box-shadow: 0 4px 12px rgba(6, 59, 46, 0.08);
-        min-height: 245px;
-    }
-
-    .compact-risk-card * {
-        color: #102A21 !important;
-    }
-
-    .compact-risk-card .jobplan-code {
-        font-size: 20px;
-        font-weight: 850;
-        color: #063B2E !important;
-        margin-bottom: 6px;
-    }
-
-    .compact-risk-card .meta {
-        font-size: 13px;
-        color: #35584A !important;
-        margin-bottom: 4px;
-    }
-
-    .compact-risk-card .risk-score-label {
-        font-size: 10px;
-        font-weight: 800;
-        color: #52635C !important;
-        text-transform: uppercase;
-        letter-spacing: .05em;
-    }
-
-    .compact-risk-card .risk-score {
-        font-size: 34px;
-        font-weight: 900;
-        color: #063B2E !important;
-        margin-top: 2px;
-        line-height: 1;
-    }
-
-    .compact-risk-card .risk-badge {
-        display: inline-block;
-        margin-top: 6px;
-        padding: 4px 10px;
-        border-radius: 999px;
-        background: #FCE8E6;
-        color: #B3261E !important;
-        font-size: 12px;
-        font-weight: 850;
-    }
-
-    .compact-risk-card .section-title {
-        margin-top: 14px;
-        font-size: 11px;
-        font-weight: 850;
-        color: #52635C !important;
-        text-transform: uppercase;
-        letter-spacing: .05em;
-    }
-
-    .compact-risk-card ul {
-        margin: 8px 0 0 18px;
-        padding: 0;
-    }
-
-    .compact-risk-card li {
-        font-size: 13px;
-        color: #102A21 !important;
-        margin-bottom: 5px;
-        line-height: 1.35;
-    }
-
-    .compact-risk-card .action {
-        margin-top: 12px;
-        font-size: 13px;
-        font-weight: 800;
-        color: #063B2E !important;
-    }
+        .risk-pill-low {
+            background: #EAB308 !important;
+            color: #000000 !important;
+        }
 
     </style>
     """,
@@ -569,1125 +341,1170 @@ st.markdown(
 )
 
 
-def safe_metric(fn, y_true, y_pred_or_score):
+def is_missing(value: Any) -> bool:
+    if value is None:
+        return True
+
     try:
-        return float(fn(y_true, y_pred_or_score))
+        import numpy as np
+
+        if isinstance(value, np.ndarray):
+            return value.size == 0
+
+        if isinstance(value, np.generic):
+            value = value.item()
     except Exception:
+        pass
+
+    if isinstance(value, (list, tuple, set, dict)):
+        return len(value) == 0
+
+    try:
+        result = pd.isna(value)
+
+        if isinstance(result, bool):
+            return result
+
+        # If pandas/numpy returns an array-like result, this is not a scalar missing value.
+        if hasattr(result, "size") and result.size != 1:
+            return False
+
+        return bool(result)
+    except Exception:
+        pass
+
+    return str(value).strip() in {"", "N/A", "nan", "None", "null"}
+
+
+def first_present(row: pd.Series, names: list[str]) -> Any:
+    for name in names:
+        if name in row.index:
+            value = row.get(name)
+            if not is_missing(value):
+                return value
+    return None
+
+
+def risk_category_from_score(score: float) -> str:
+    if score >= 75:
+        return "High"
+    if score >= 50:
+        return "Medium"
+    return "Low"
+
+
+def parse_drivers(value: Any) -> list[str]:
+    if isinstance(value, list):
+        return [str(v) for v in value if not is_missing(v)]
+
+    if is_missing(value):
+        return []
+
+    if isinstance(value, str):
+        value = value.strip()
+
+        try:
+            parsed = ast.literal_eval(value)
+            if isinstance(parsed, list):
+                return [str(v) for v in parsed if not is_missing(v)]
+        except Exception:
+            pass
+
+        if " | " in value:
+            return [v.strip() for v in value.split(" | ") if v.strip()]
+
+        if ";" in value:
+            return [v.strip() for v in value.split(";") if v.strip()]
+
+        return [value]
+
+    return [str(value)]
+
+
+def derive_context(row: pd.Series) -> tuple[str, str, str]:
+    trust = first_present(
+        row,
+        [
+            "trustLevelCode",
+            "trust_level_code",
+            "TrustLevelCode",
+            "target_department",
+            "departmentCode",
+        ],
+    )
+
+    department = first_present(
+        row,
+        [
+            "department",
+            "Department",
+            "department_name",
+            "departmentName",
+            "target_department_name",
+        ],
+    )
+
+    specialty = first_present(
+        row,
+        [
+            "specialty",
+            "Specialty",
+            "speciality",
+            "Speciality",
+            "specialty_name",
+            "specialtyName",
+        ],
+    )
+
+    if not is_missing(trust) and trust in TRUST_CONTEXT:
+        mapped_department, mapped_specialty = TRUST_CONTEXT[trust]
+
+        if is_missing(department):
+            department = mapped_department
+
+        if is_missing(specialty):
+            specialty = mapped_specialty
+
+    if is_missing(trust):
+        trust = "Unknown Trust"
+
+    if is_missing(department):
+        department = "Unknown Department"
+
+    if is_missing(specialty):
+        specialty = "Unknown Specialty"
+
+    return str(trust), str(department), str(specialty)
+
+
+def normalise_scored_df(df: pd.DataFrame) -> pd.DataFrame:
+    df = df.copy()
+
+    if "riskScore" not in df.columns:
+        raise ValueError("riskScore column is missing from scored data.")
+
+    df["riskScore"] = pd.to_numeric(df["riskScore"], errors="coerce").fillna(0.0)
+
+    if "riskCategory" not in df.columns:
+        df["riskCategory"] = df["riskScore"].apply(risk_category_from_score)
+
+    contexts = df.apply(derive_context, axis=1, result_type="expand")
+    df["trustLevelCode"] = contexts[0]
+    df["trust_level_code"] = contexts[0]
+    df["department"] = contexts[1]
+    df["specialty"] = contexts[2]
+
+    if "mainDrivers" in df.columns:
+        df["mainDrivers"] = df["mainDrivers"].apply(parse_drivers)
+    elif "mainDriversText" in df.columns:
+        df["mainDrivers"] = df["mainDriversText"].apply(parse_drivers)
+    else:
+        df["mainDrivers"] = [[] for _ in range(len(df))]
+
+    df["mainDriversText"] = df["mainDrivers"].apply(lambda drivers: " | ".join(drivers))
+
+    if "recommendedAction" not in df.columns:
+        df["recommendedAction"] = df["riskCategory"].map(
+            {
+                "High": "Immediate Clinical Director review",
+                "Medium": "Review during next job planning checkpoint",
+                "Low": "No immediate action required",
+            }
+        )
+
+    if "riskInterpretation" not in df.columns:
+        df["riskInterpretation"] = df["riskCategory"].map(
+            {
+                "High": "This JobPlan should be prioritised for review.",
+                "Medium": "This JobPlan has moderate risk signals and should be monitored.",
+                "Low": "This JobPlan appears stable based on the current POC signals.",
+            }
+        )
+
+    if "dataConfidence" not in df.columns:
+        df["dataConfidence"] = "High"
+
+    return df
+
+
+def load_metadata() -> dict:
+    metadata_path = MODEL_DIR / "metadata.json"
+    if metadata_path.exists():
+        return json.loads(metadata_path.read_text(encoding="utf-8"))
+    return {}
+
+
+def load_evaluation_report() -> dict:
+    evaluation_path = OUTPUT_DIR / "evaluation_report.json"
+    if evaluation_path.exists():
+        return json.loads(evaluation_path.read_text(encoding="utf-8"))
+    return {}
+
+
+def load_scored_data() -> pd.DataFrame:
+    OUTPUT_DIR.mkdir(exist_ok=True)
+
+    if RISK_SCORES_PATH.exists():
+        df = pd.read_csv(RISK_SCORES_PATH)
+        return normalise_scored_df(df)
+
+    if not DATA_PATH.exists():
+        st.error("No scored output or input dataset found.")
+        st.stop()
+
+    try:
+        from jobplan_risk.score import score
+
+        raw_df = pd.read_csv(DATA_PATH)
+        scored = score(raw_df, MODEL_DIR)
+        scored_df = pd.DataFrame(scored)
+        scored_df = normalise_scored_df(scored_df)
+
+        scored_df.to_csv(RISK_SCORES_PATH, index=False)
+        (OUTPUT_DIR / "risk_scores.json").write_text(
+            scored_df.to_json(orient="records", indent=2),
+            encoding="utf-8",
+        )
+
+        return scored_df
+
+    except Exception as exc:
+        st.error(f"Could not score data: {exc}")
+        st.stop()
+
+
+def active_model_name(metadata: dict) -> tuple[str, str]:
+    raw = (
+        metadata.get("model_mode")
+        or metadata.get("active_model")
+        or metadata.get("model_name")
+        or "hist_gradient_boosting"
+    )
+    return str(raw), MODEL_DISPLAY_NAMES.get(str(raw), str(raw))
+
+
+def metrics_for_active_model(report: dict, active_raw: str) -> dict:
+    if not isinstance(report, dict):
+        return {}
+
+    candidate = None
+
+    if active_raw in report:
+        candidate = report[active_raw]
+
+    elif "models" in report and isinstance(report["models"], dict):
+        candidate = report["models"].get(active_raw)
+
+    elif "model_results" in report and isinstance(report["model_results"], dict):
+        candidate = report["model_results"].get(active_raw)
+
+    elif "metrics" in report and isinstance(report["metrics"], dict):
+        candidate = report["metrics"]
+
+    else:
+        candidate = report
+
+    if isinstance(candidate, dict) and "test" in candidate and isinstance(candidate["test"], dict):
+        candidate = candidate["test"]
+
+    if isinstance(candidate, dict) and "metrics" in candidate and isinstance(candidate["metrics"], dict):
+        candidate = candidate["metrics"]
+
+    return candidate if isinstance(candidate, dict) else {}
+
+
+def metric_value(metrics: dict, *names: str) -> Any:
+    for name in names:
+        if name in metrics:
+            return metrics[name]
+    return None
+
+
+def format_number(value: Any, digits: int = 1) -> str:
+    if is_missing(value):
+        return "N/A"
+
+    try:
+        return f"{float(value):.{digits}f}"
+    except Exception:
+        return str(value)
+
+
+def metric_cards(cards: list[tuple[str, str, str]]) -> None:
+    html_cards = ""
+    for label, value, help_text in cards:
+        html_cards += f"""
+        <div class="metric-card">
+            <div class="metric-label">{html.escape(label)}</div>
+            <div class="metric-value">{html.escape(str(value))}</div>
+            <div class="metric-help">{html.escape(help_text)}</div>
+        </div>
+        """
+
+    st.markdown(
+        f"""
+        <div class="metric-grid">
+            {html_cards}
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def risk_card(row: pd.Series) -> None:
+    job_plan = row.get("jobPlanCode", row.get("job_plan_code", "N/A"))
+    trust = row.get("trustLevelCode", row.get("trust_level_code", "Unknown Trust"))
+    department = row.get("department", "Unknown Department")
+    specialty = row.get("specialty", "Unknown Specialty")
+    score = format_number(row.get("riskScore"), 1)
+
+    raw_category = str(row.get("riskCategory", "High")).strip().lower()
+
+    category = {
+        "high": "High",
+        "medium": "Medium",
+        "low": "Low",
+    }.get(raw_category, "High")
+
+    category_key = category.lower()
+
+    action = row.get("recommendedAction", "Immediate Clinical Director review")
+    drivers = parse_drivers(row.get("mainDrivers", row.get("mainDriversText", [])))[:3]
+
+    category_class = f"risk-card-{category_key}"
+    score_class = f"risk-score-{category_key}"
+    pill_class = f"risk-pill-{category_key}"
+
+    driver_items = "".join(
+        f"<li>{html.escape(str(driver))}</li>" for driver in drivers
+    )
+
+    if not driver_items:
+        driver_items = "<li>No driver details available.</li>"
+
+    st.markdown(
+        f"""
+        <div class="risk-card {category_class}">
+            <div class="risk-title">{html.escape(str(job_plan))}</div>
+            <div class="risk-context">{html.escape(str(department))} / {html.escape(str(specialty))}</div>
+            <div class="risk-context">Trust: {html.escape(str(trust))}</div>
+            <div class="risk-score {score_class}">{html.escape(score)}</div>
+            <span class="risk-pill {pill_class}">{html.escape(category)}</span>
+            <div style="font-weight:850; margin-top:12px;">Main Risk Drivers</div>
+            <ul class="driver-list">{driver_items}</ul>
+            <div class="action-box">Action: {html.escape(str(action))}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def clean_nulls(obj: Any) -> Any:
+    def to_json_safe(value: Any) -> Any:
+        try:
+            import numpy as np
+
+            if isinstance(value, np.ndarray):
+                return value.tolist()
+
+            if isinstance(value, np.generic):
+                return value.item()
+        except Exception:
+            pass
+
+        if isinstance(value, pd.Timestamp):
+            return value.isoformat()
+
+        return value
+
+    def is_empty_cleaned(value: Any) -> bool:
+        if value is None:
+            return True
+
+        if value == "":
+            return True
+
+        try:
+            import numpy as np
+
+            if isinstance(value, np.ndarray):
+                return value.size == 0
+        except Exception:
+            pass
+
+        if isinstance(value, (list, tuple, set, dict)):
+            return len(value) == 0
+
+        return False
+
+    obj = to_json_safe(obj)
+
+    if isinstance(obj, dict):
+        cleaned = {}
+
+        for key, value in obj.items():
+            cleaned_value = clean_nulls(value)
+
+            if not is_empty_cleaned(cleaned_value):
+                cleaned[key] = cleaned_value
+
+        return cleaned
+
+    if isinstance(obj, (list, tuple, set)):
+        cleaned_list = []
+
+        for item in obj:
+            cleaned_item = clean_nulls(item)
+
+            if not is_empty_cleaned(cleaned_item):
+                cleaned_list.append(cleaned_item)
+
+        return cleaned_list
+
+    if is_missing(obj):
         return None
 
-
-def as_bool_series(series: pd.Series) -> pd.Series:
-    return series.astype(str).str.lower().isin(["true", "1", "yes"])
+    return to_json_safe(obj)
 
 
-def as_num_series(series: pd.Series) -> pd.Series:
-    return pd.to_numeric(series, errors="coerce")
+def build_handoff_df(scored_df: pd.DataFrame) -> pd.DataFrame:
+    high_risk_df = scored_df[scored_df["riskCategory"] == "High"].copy()
+    high_risk_df = high_risk_df.sort_values("riskScore", ascending=False)
 
-
-@st.cache_data
-def load_data(path: str) -> pd.DataFrame:
-    return pd.read_csv(path)
-
-
-@st.cache_data(show_spinner=False)
-def evaluate_models_cached(df: pd.DataFrame) -> dict:
-    features = prepare_features(df)
-    y = build_pseudo_labels(features)
-    X = features[MODEL_FEATURES]
-
-    if "planning_year" in df.columns and df["planning_year"].nunique() >= 2:
-        max_year = df["planning_year"].max()
-        train_idx = df["planning_year"] < max_year
-        test_idx = df["planning_year"] == max_year
-        split_strategy = f"time_based_train_before_{max_year}_test_{max_year}"
-    else:
-        train_positions, test_positions = train_test_split(
-            np.arange(len(df)),
-            test_size=0.25,
-            random_state=42,
-            stratify=y if y.nunique() == 2 else None,
-        )
-        train_idx = df.index.isin(train_positions)
-        test_idx = df.index.isin(test_positions)
-        split_strategy = "random_stratified_split"
-
-    X_train = X.loc[train_idx]
-    X_test = X.loc[test_idx]
-    y_train = y.loc[train_idx]
-    y_test = y.loc[test_idx]
-
-    models = {
-        "logistic_regression": Pipeline(
-            [
-                ("preprocess", build_preprocessor()),
-                (
-                    "model",
-                    LogisticRegression(
-                        max_iter=1000,
-                        class_weight="balanced",
-                        random_state=42,
-                    ),
-                ),
-            ]
-        ),
-        "hist_gradient_boosting": Pipeline(
-            [
-                ("preprocess", build_preprocessor()),
-                (
-                    "model",
-                    HistGradientBoostingClassifier(
-                        max_iter=100,
-                        learning_rate=0.05,
-                        random_state=42,
-                    ),
-                ),
-            ]
-        ),
-    }
-
-    report = {
-        "splitStrategy": split_strategy,
-        "rowsTotal": int(len(df)),
-        "rowsTrain": int(len(X_train)),
-        "rowsTest": int(len(X_test)),
-        "positiveRateTrain": float(y_train.mean()),
-        "positiveRateTest": float(y_test.mean()),
-        "models": {},
-    }
-
-    for name, model in models.items():
-        model.fit(X_train, y_train)
-        y_score = model.predict_proba(X_test)[:, 1]
-        y_pred = (y_score >= 0.5).astype(int)
-
-        report["models"][name] = {
-            "accuracy": safe_metric(accuracy_score, y_test, y_pred),
-            "precision": safe_metric(lambda a, b: precision_score(a, b, zero_division=0), y_test, y_pred),
-            "recall": safe_metric(lambda a, b: recall_score(a, b, zero_division=0), y_test, y_pred),
-            "f1": safe_metric(lambda a, b: f1_score(a, b, zero_division=0), y_test, y_pred),
-            "rocAuc": safe_metric(roc_auc_score, y_test, y_score),
-            "averagePrecision": safe_metric(average_precision_score, y_test, y_score),
-            "confusionMatrix": confusion_matrix(y_test, y_pred).tolist(),
-            "classificationReport": classification_report(
-                y_test,
-                y_pred,
-                zero_division=0,
-                output_dict=True,
-            ),
-        }
-
-    return report
-
-
-@st.cache_data(show_spinner=False)
-def score_cached(df: pd.DataFrame) -> pd.DataFrame:
-    scored = score(df, MODEL_DIR)
-    scored_df = pd.DataFrame(scored)
-
-    enrichment_cols = [
-        "job_plan_code",
-        "trust_level_code",
-        "parent_trust_level_code",
+    base_columns = [
+        "jobPlanCode",
+        "trustLevelCode",
         "department",
         "specialty",
-        "planning_year",
-        "plan_stage",
+        "riskScore",
+        "riskCategory",
+        "mainDrivers",
+        "mainDriversText",
+        "recommendedAction",
+        "riskInterpretation",
+        "dataConfidence",
+        "modelRiskComponent",
+        "ruleRiskComponent",
+    ]
+
+    optional_evidence_columns = [
         "totalPAs",
         "dccPAs",
         "spaPAs",
-        "cpPAs",
-        "otherPAs",
-        "priorTotalPAs",
         "priorDccPAs",
         "priorSpaPAs",
-        "peerMedianSpaShare",
-        "peerMedianDccShare",
-        "paLimitBreach",
-        "spaAbovePeerThreshold",
-        "hasTeamPlanLink",
-        "missingTeamPlanLink",
         "teamPlanAlignmentScore",
         "teamDemandPAs",
         "teamPlannedCapacityPAs",
         "historyChangeCount",
-        "hasMediationOrAppeal",
-        "hasNewManagerChanges",
-        "planReturnedToDiscussionAfterSignoff",
         "isLocum",
-        "gradeCode",
     ]
 
-    available_cols = [c for c in enrichment_cols if c in df.columns]
-    enrich = df[available_cols].copy()
+    selected_columns = [col for col in base_columns if col in high_risk_df.columns]
 
-    if "job_plan_code" in enrich.columns:
-        enrich = enrich.rename(columns={"job_plan_code": "jobPlanCode"})
-        scored_df = scored_df.merge(enrich, on="jobPlanCode", how="left")
+    for col in optional_evidence_columns:
+        if col in high_risk_df.columns and not high_risk_df[col].isna().all():
+            selected_columns.append(col)
 
-    if "mainDrivers" in scored_df.columns:
-        scored_df["mainDriversText"] = scored_df["mainDrivers"].apply(
-            lambda x: " | ".join(x) if isinstance(x, list) else str(x)
-        )
-
-    scored_df["riskBandSort"] = scored_df["riskCategory"].map(
-        {"High": 3, "Medium": 2, "Low": 1}
-    ).fillna(0)
-
-    return scored_df
+    return high_risk_df[selected_columns].copy()
 
 
-def risk_badge(category: str) -> str:
-    if category == "High":
-        return "🔴 High"
-    if category == "Medium":
-        return "🟠 Medium"
-    return "🟢 Low"
+def save_exports(scored_df: pd.DataFrame) -> pd.DataFrame:
+    OUTPUT_DIR.mkdir(exist_ok=True)
 
+    handoff_df = build_handoff_df(scored_df)
 
-def action_recommendation(row: pd.Series) -> str:
-    drivers = row.get("mainDriversText", "")
-    score_value = float(row.get("riskScore", 0))
-
-    if score_value >= 85:
-        return "Immediate Clinical Director review"
-    if "team-plan alignment" in str(drivers).lower() or "alignment" in str(drivers).lower():
-        return "Review service demand/capacity alignment"
-    if "spa" in str(drivers).lower():
-        return "Review SPA/DCC balance with clinician"
-    if "history" in str(drivers).lower() or "returned" in str(drivers).lower():
-        return "Review workflow instability and plan changes"
-    if score_value >= 70:
-        return "Prioritise in next job-planning review"
-    return "Monitor"
-
-
-def risk_card(row: pd.Series) -> None:
-    category = row.get("riskCategory", "Low")
-    css = "risk-high" if category == "High" else "risk-medium" if category == "Medium" else "risk-low"
-
-    drivers = row.get("mainDrivers", [])
-    if not isinstance(drivers, list):
-        drivers = [str(drivers)]
-
-    driver_html = "".join([f"<div class='driver'>• {d}</div>" for d in drivers[:3]])
-
-    st.markdown(
-        f"""
-        <div class="risk-card {css}">
-            <div style="display:flex; justify-content:space-between; align-items:center;">
-                <div>
-                    <div class="small-label">JobPlan</div>
-                    <div style="font-size:22px; font-weight:800;">{row.get("jobPlanCode", "")}</div>
-                    <div style="margin-top:6px;">{row.get("department", "N/A")} / {row.get("specialty", "N/A")}</div>
-                    <div style="color:#666;">Stage: {row.get("plan_stage", "N/A")} | Trust: {row.get("trust_level_code", "N/A")}</div>
-                </div>
-                <div style="text-align:right;">
-                    <div class="small-label">Risk Score</div>
-                    <div class="big-number">{row.get("riskScore", 0):.1f}</div>
-                    <div>{risk_badge(category)}</div>
-                </div>
-            </div>
-            <hr/>
-            <div class="small-label">Main Risk Drivers</div>
-            {driver_html}
-            <div class="nhs-action">Recommended action: {action_recommendation(row)}</div>
-        </div>
-        """,
-        unsafe_allow_html=True,
+    scored_export_df = scored_df.copy()
+    scored_export_df.to_csv(OUTPUT_DIR / "risk_scores.csv", index=False)
+    (OUTPUT_DIR / "risk_scores.json").write_text(
+        scored_export_df.to_json(orient="records", indent=2),
+        encoding="utf-8",
     )
 
-
-def driver_summary(scored_df: pd.DataFrame) -> pd.DataFrame:
-    rows = []
-    for _, row in scored_df.iterrows():
-        drivers = row.get("mainDrivers", [])
-        if not isinstance(drivers, list):
-            continue
-        for driver in drivers:
-            rows.append(
-                {
-                    "driver": driver,
-                    "riskCategory": row.get("riskCategory"),
-                    "riskScore": row.get("riskScore"),
-                }
-            )
-
-    if not rows:
-        return pd.DataFrame(columns=["driver", "count", "avgRiskScore", "highRiskCount"])
-
-    d = pd.DataFrame(rows)
-    return (
-        d.groupby("driver")
-        .agg(
-            count=("driver", "size"),
-            avgRiskScore=("riskScore", "mean"),
-            highRiskCount=("riskCategory", lambda x: int((x == "High").sum())),
-        )
-        .reset_index()
-        .sort_values(["highRiskCount", "count", "avgRiskScore"], ascending=False)
+    handoff_df.to_csv(HIGH_RISK_CSV_PATH, index=False)
+    HIGH_RISK_JSON_PATH.write_text(
+        handoff_df.to_json(orient="records", indent=2),
+        encoding="utf-8",
     )
 
-
-def build_hotspots(scored_df: pd.DataFrame) -> pd.DataFrame:
-    group_cols = [c for c in ["trust_level_code", "department", "specialty"] if c in scored_df.columns]
-
-    if not group_cols:
-        return pd.DataFrame()
-
-    grouped = (
-        scored_df.groupby(group_cols)
-        .agg(
-            totalPlans=("jobPlanCode", "count"),
-            highRiskPlans=("riskCategory", lambda x: int((x == "High").sum())),
-            mediumRiskPlans=("riskCategory", lambda x: int((x == "Medium").sum())),
-            avgRiskScore=("riskScore", "mean"),
-            maxRiskScore=("riskScore", "max"),
-            avgTeamAlignment=("teamPlanAlignmentScore", "mean") if "teamPlanAlignmentScore" in scored_df.columns else ("riskScore", "mean"),
-            avgTotalPAs=("totalPAs", "mean") if "totalPAs" in scored_df.columns else ("riskScore", "mean"),
-        )
-        .reset_index()
-    )
-
-    grouped["highRiskRate"] = grouped["highRiskPlans"] / grouped["totalPlans"]
-    grouped["operationalPriorityScore"] = (
-        grouped["highRiskPlans"] * 3
-        + grouped["mediumRiskPlans"] * 1.5
-        + grouped["avgRiskScore"] / 20
-    )
-
-    return grouped.sort_values(
-        ["operationalPriorityScore", "highRiskPlans", "avgRiskScore"],
-        ascending=False,
-    )
+    return handoff_df
 
 
-def make_action_queue(scored_df: pd.DataFrame) -> pd.DataFrame:
-    queue = scored_df.copy()
-    queue["recommendedAction"] = queue.apply(action_recommendation, axis=1)
+def example_handoff_json(row: pd.Series) -> dict:
+    drivers = parse_drivers(row.get("mainDrivers", row.get("mainDriversText", [])))[:3]
 
-    if "teamPlanAlignmentScore" in queue.columns:
-        queue["teamPlanAlignmentScore"] = pd.to_numeric(queue["teamPlanAlignmentScore"], errors="coerce")
+    payload = {
+        "source": "analyser-ml",
+        "purpose": "JobPlan review prioritisation",
+        "jobPlanCode": row.get("jobPlanCode"),
+        "trustLevelCode": row.get("trustLevelCode"),
+        "department": row.get("department"),
+        "specialty": row.get("specialty"),
+        "riskScore": row.get("riskScore"),
+        "riskCategory": row.get("riskCategory"),
+        "mainDrivers": drivers,
+        "recommendedAction": row.get("recommendedAction"),
+        "riskComponents": {
+            "modelRiskComponent": row.get("modelRiskComponent"),
+            "ruleRiskComponent": row.get("ruleRiskComponent"),
+            "dataConfidence": row.get("dataConfidence"),
+        },
+        "decisionPolicy": "Review prioritisation only. Not an automated approval or rejection decision.",
+    }
 
-    columns = [
-        "jobPlanCode",
-        "riskScore",
-        "riskCategory",
-        "recommendedAction",
-        "trust_level_code",
-        "department",
-        "specialty",
-        "plan_stage",
-        "totalPAs",
-        "dccPAs",
-        "spaPAs",
-        "priorSpaPAs",
-        "teamPlanAlignmentScore",
-        "historyChangeCount",
-        "mainDriversText",
-    ]
+    return clean_nulls(payload)
 
-    available = [c for c in columns if c in queue.columns]
 
-    return queue.sort_values(
-        ["riskBandSort", "riskScore"],
-        ascending=False,
-    )[available]
+scored_df = load_scored_data()
+metadata = load_metadata()
+evaluation_report = load_evaluation_report()
+active_raw_model, active_display_model = active_model_name(metadata)
+active_metrics = metrics_for_active_model(evaluation_report, active_raw_model)
+handoff_df = save_exports(scored_df)
 
+high_risk_df = scored_df[scored_df["riskCategory"] == "High"].copy()
+high_risk_df = high_risk_df.sort_values("riskScore", ascending=False).reset_index(drop=True)
+
+medium_risk_df = scored_df[scored_df["riskCategory"] == "Medium"].copy()
+low_risk_df = scored_df[scored_df["riskCategory"] == "Low"].copy()
 
 st.markdown(
     """
-    <div class="brand-header">
-        <div class="brand-logo">RLDatix • Workforce Intelligence</div>
-        <div class="brand-title">AI JobPlan Risk Dashboard</div>
-        <div class="brand-subtitle">
-            Green-theme stakeholder view for NHS-style job-planning risk prioritisation
-        </div>
+    <div class="main-title">JobPlan ML Risk Layer POC</div>
+    <div class="main-subtitle">
+        Review prioritisation for JobPlans using ML risk scoring, explainable drivers, and structured integration output.
     </div>
     """,
     unsafe_allow_html=True,
 )
-st.markdown(
-    "<div class='subtitle'>Stakeholder view for NHS-style job-planning risk prioritisation</div>",
-    unsafe_allow_html=True,
-)
 
-if not DATA_PATH.exists():
-    st.error("Dataset not found. Expected file: data/staging_plan_features.csv")
-    st.stop()
 
-OUTPUT_DIR.mkdir(exist_ok=True)
-
-with st.spinner("Loading dataset..."):
-    df = load_data(str(DATA_PATH))
-
-with st.spinner("Training model..."):
-    training_metadata = train(DATA_PATH, MODEL_DIR)
-
-with st.spinner("Evaluating model..."):
-    evaluation_report = evaluate_models_cached(df)
-
-with st.spinner("Scoring JobPlans..."):
-    scored_df = score_cached(df)
-
-training_metadata_path = OUTPUT_DIR / "training_metadata.json"
-evaluation_report_path = OUTPUT_DIR / "evaluation_report.json"
-risk_scores_csv_path = OUTPUT_DIR / "risk_scores.csv"
-risk_scores_json_path = OUTPUT_DIR / "risk_scores.json"
-
-training_metadata_path.write_text(json.dumps(training_metadata, indent=2), encoding="utf-8")
-evaluation_report_path.write_text(json.dumps(evaluation_report, indent=2), encoding="utf-8")
-scored_df.to_csv(risk_scores_csv_path, index=False)
-risk_scores_json_path.write_text(scored_df.to_json(orient="records", indent=2), encoding="utf-8")
-
-tab_risk, tab_high_risk, tab_eval, tab_train, tab_data, tab_export = st.tabs(
+tab_overview, tab_scores, tab_high_risk, tab_drivers, tab_model, tab_export = st.tabs(
     [
-        "🚦 Risk Scores",
-        "🔥 Highest-Risk JobPlans",
-        "📈 Evaluation",
-        "🧠 Training Details",
-        "📄 Dataset",
-        "🔌 Export / Integration",
+        "POC Overview",
+        "Risk Scores",
+        "JobPlan Review Queue",
+        "Drivers & Hotspots",
+        "Model & Training",
+        "Export & Integration",
     ]
 )
 
 
-
-
-def component_risk_card(row):
-    import ast
-
-    job_plan_code = html.escape(str(row.get("jobPlanCode", "N/A")))
-    department = html.escape(str(row.get("department", "N/A")))
-    specialty = html.escape(str(row.get("specialty", "N/A")))
-    plan_stage = html.escape(str(row.get("plan_stage", "N/A")))
-    trust = html.escape(str(row.get("trust_level_code", "N/A")))
-    recommended_action = html.escape(str(row.get("recommendedAction", "Immediate Clinical Director review")))
-
-    try:
-        risk_score = float(row.get("riskScore", 0))
-    except Exception:
-        risk_score = 0.0
-
-    drivers = row.get("mainDrivers", [])
-
-    if isinstance(drivers, str):
-        try:
-            parsed = ast.literal_eval(drivers)
-            drivers = parsed if isinstance(parsed, list) else [drivers]
-        except Exception:
-            if " | " in drivers:
-                drivers = drivers.split(" | ")
-            elif ";" in drivers:
-                drivers = drivers.split(";")
-            else:
-                drivers = [drivers]
-
-    if not isinstance(drivers, list):
-        drivers = [str(drivers)]
-
-    drivers = [str(d).strip() for d in drivers if str(d).strip()]
-
-    drivers_html = "".join(
-        [
-            f"""
-            <div class="driver">
-                <span class="dot">•</span>
-                <span>{html.escape(driver)}</span>
-            </div>
-            """
-            for driver in drivers[:3]
-        ]
-    )
-
-    if not drivers_html:
-        drivers_html = '<div class="driver muted">No risk drivers available.</div>'
-
-    card_html = f"""
-    <!DOCTYPE html>
-    <html>
-    <head>
-    <style>
-        html, body {{
-            margin: 0;
-            padding: 0;
-            background: transparent;
-            font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-        }}
-
-        .card {{
-            height: 430px;
-            box-sizing: border-box;
-            background: linear-gradient(180deg, #FFFFFF 0%, #F7FCFA 100%);
-            border: 3px solid #0B6F4F;
-            border-left: 12px solid #B3261E;
-            border-radius: 24px;
-            padding: 18px 18px 16px 18px;
-            box-shadow:
-                0 18px 42px rgba(6, 59, 46, 0.26),
-                0 5px 14px rgba(6, 59, 46, 0.14),
-                inset 0 1px 0 rgba(255, 255, 255, 0.95);
-            overflow: hidden;
-        }}
-
-        .top {{
-            display: flex;
-            justify-content: space-between;
-            gap: 14px;
-            align-items: flex-start;
-        }}
-
-        .label {{
-            font-size: 10px;
-            font-weight: 900;
-            color: #52635C;
-            text-transform: uppercase;
-            letter-spacing: 0.08em;
-            margin-bottom: 6px;
-        }}
-
-        .code {{
-            font-size: 19px;
-            font-weight: 900;
-            color: #063B2E;
-            letter-spacing: -0.02em;
-            margin-bottom: 8px;
-        }}
-
-        .meta {{
-            font-size: 12.5px;
-            color: #35584A;
-            margin-bottom: 5px;
-            line-height: 1.35;
-        }}
-
-        .risk-box {{
-            min-width: 98px;
-            text-align: right;
-            background: #EFF8F3;
-            border: 2px solid #CFE7DC;
-            border-radius: 18px;
-            padding: 10px;
-            box-shadow: 0 8px 18px rgba(6, 59, 46, 0.14);
-        }}
-
-        .score {{
-            font-size: 34px;
-            font-weight: 950;
-            color: #063B2E;
-            line-height: 1;
-            margin-top: 4px;
-        }}
-
-        .badge {{
-            display: inline-block;
-            margin-top: 8px;
-            padding: 5px 10px;
-            border-radius: 999px;
-            background: #FCE8E6;
-            border: 1px solid #F4B8B3;
-            color: #B3261E;
-            font-size: 12px;
-            font-weight: 900;
-            box-shadow: 0 4px 10px rgba(179, 38, 30, 0.12);
-        }}
-
-        .divider {{
-            height: 1px;
-            background: #CFE7DC;
-            margin: 14px 0 12px 0;
-        }}
-
-        .driver-panel {{
-            background: #FFFFFF;
-            border: 2px solid #CFE7DC;
-            border-radius: 16px;
-            padding: 12px;
-            min-height: 135px;
-            box-shadow: inset 0 1px 0 rgba(255,255,255,0.95);
-        }}
-
-        .driver {{
-            display: flex;
-            gap: 7px;
-            align-items: flex-start;
-            font-size: 12.5px;
-            line-height: 1.35;
-            color: #102A21;
-            margin-bottom: 7px;
-        }}
-
-        .dot {{
-            color: #B3261E;
-            font-weight: 900;
-        }}
-
-        .muted {{
-            color: #52635C;
-            font-style: italic;
-        }}
-
-        .action {{
-            margin-top: 10px;
-            padding: 9px 11px;
-            border-radius: 14px;
-            background: #F3FAF6;
-            border: 2px solid #CFE7DC;
-            font-size: 12.5px;
-            font-weight: 850;
-            line-height: 1.35;
-            color: #063B2E;
-        }}
-    </style>
-    </head>
-    <body>
-        <div class="card">
-            <div class="top">
-                <div>
-                    <div class="label">JobPlan</div>
-                    <div class="code">{job_plan_code}</div>
-                    <div class="meta">{department} / {specialty}</div>
-                    <div class="meta">Stage: {plan_stage} | Trust: {trust}</div>
-                </div>
-
-                <div class="risk-box">
-                    <div class="label">Risk Score</div>
-                    <div class="score">{risk_score:.1f}</div>
-                    <div class="badge">🔴 High</div>
-                </div>
-            </div>
-
-            <div class="divider"></div>
-
-            <div class="driver-panel">
-                <div class="label">Main Risk Drivers</div>
-                {drivers_html}
-            </div>
-
-            <div class="action">Recommended action: {recommended_action}</div>
-        </div>
-    </body>
-    </html>
-    """
-
-    components.html(card_html, height=470, scrolling=False)
-
-
-with tab_risk:
-    st.header("🚦 Executive JobPlan Risk View")
-
-    total_plans = len(scored_df)
-    high_count = int((scored_df["riskCategory"] == "High").sum())
-    medium_count = int((scored_df["riskCategory"] == "Medium").sum())
-    low_count = int((scored_df["riskCategory"] == "Low").sum())
-    high_rate = high_count / total_plans if total_plans else 0
-    avg_score = float(scored_df["riskScore"].mean())
-    max_score = float(scored_df["riskScore"].max())
-
-    hotspots = build_hotspots(scored_df)
-    top_hotspot = hotspots.iloc[0] if len(hotspots) > 0 else None
-
-    if top_hotspot is not None:
-        hotspot_text = (
-            f"{top_hotspot.get('specialty', 'N/A')} "
-            f"({top_hotspot.get('trust_level_code', 'N/A')})"
-        )
-    else:
-        hotspot_text = "N/A"
+with tab_overview:
+    st.header("POC Overview")
 
     st.markdown(
-        f"""
+        """
         <div class="hero-box">
-            <div style="font-size:22px; font-weight:800; margin-bottom:8px;">
-                Executive Summary
-            </div>
-            <div style="font-size:16px;">
-                The ML layer scored <b>{total_plans:,}</b> JobPlans.
-                <span class="urgent">{high_count:,}</span> are currently prioritised as High Risk
-                and <span class="medium">{medium_count:,}</span> as Medium Risk.
-                The main operational hotspot is <b>{hotspot_text}</b>.
-            </div>
-            <div style="margin-top:10px; color:#555;">
-                This view is designed for Clinical Directors, Medical Staffing, Workforce Planning and Product stakeholders.
+            <div class="hero-title">What this POC demonstrates</div>
+            <div class="hero-text">
+                This POC shows how a machine-learning risk layer can help prioritise JobPlans for review.
+                Each JobPlan receives a 0–100 risk score, a risk category, main risk drivers, and a recommended review action.
+                The goal is not to replace Clinical Director judgement, but to help product and engineering teams understand how ML could support review prioritisation.
             </div>
         </div>
         """,
         unsafe_allow_html=True,
     )
 
-    k1, k2, k3, k4, k5 = st.columns(5)
-    k1.metric("Total JobPlans Scored", f"{total_plans:,}")
-    k2.metric("High Risk Plans", f"{high_count:,}", f"{high_rate:.1%}")
-    k3.metric("Medium Risk Plans", f"{medium_count:,}")
-    k4.metric("Average Risk Score", f"{avg_score:.1f}")
-    k5.metric("Highest Risk Score", f"{max_score:.1f}")
-
-    st.divider()
-
-    st.subheader("NHS Operational Risk Signals")
-
-    signal_cols = st.columns(4)
-
-    pa_breach_count = int(as_bool_series(scored_df["paLimitBreach"]).sum()) if "paLimitBreach" in scored_df.columns else 0
-
-    if "teamPlanAlignmentScore" in scored_df.columns:
-        alignment = as_num_series(scored_df["teamPlanAlignmentScore"])
-        demand_capacity_count = int((alignment < 0.8).sum())
-    else:
-        demand_capacity_count = 0
-
-    if {"spaPAs", "priorSpaPAs"}.issubset(scored_df.columns):
-        spa_delta = as_num_series(scored_df["spaPAs"]) - as_num_series(scored_df["priorSpaPAs"])
-        spa_drift_count = int((spa_delta > 0.5).sum())
-    else:
-        spa_drift_count = 0
-
-    workflow_count = 0
-    if "historyChangeCount" in scored_df.columns:
-        workflow_count += int((as_num_series(scored_df["historyChangeCount"]) > 14).sum())
-    if "planReturnedToDiscussionAfterSignoff" in scored_df.columns:
-        workflow_count += int(as_bool_series(scored_df["planReturnedToDiscussionAfterSignoff"]).sum())
-
-    signal_cols[0].metric("Compliance / PA Limit Risk", f"{pa_breach_count:,}")
-    signal_cols[1].metric("Demand-Capacity Alignment Risk", f"{demand_capacity_count:,}")
-    signal_cols[2].metric("SPA / DCC Balance Drift", f"{spa_drift_count:,}")
-    signal_cols[3].metric("Workflow Instability Signals", f"{workflow_count:,}")
-
-    st.divider()
-
-    filter_col, main_col = st.columns([1, 3])
-
-    with filter_col:
-        st.markdown("### Filters")
-
-        categories = st.multiselect(
-            "Risk Category",
-            ["High", "Medium", "Low"],
-            default=["High", "Medium", "Low"],
-        )
-
-        if "department" in scored_df.columns:
-            departments = sorted(scored_df["department"].dropna().unique().tolist())
-            selected_departments = st.multiselect(
-                "Department",
-                departments,
-                default=departments,
-            )
-        else:
-            selected_departments = []
-
-        if "specialty" in scored_df.columns:
-            specialties = sorted(scored_df["specialty"].dropna().unique().tolist())
-            selected_specialties = st.multiselect(
-                "Specialty",
-                specialties,
-                default=specialties,
-            )
-        else:
-            selected_specialties = []
-
-        min_score = st.slider(
-            "Minimum Risk Score",
-            min_value=0,
-            max_value=100,
-            value=0,
-            step=5,
-        )
-
-    filtered = scored_df.copy()
-
-    if categories:
-        filtered = filtered[filtered["riskCategory"].isin(categories)]
-
-    if selected_departments and "department" in filtered.columns:
-        filtered = filtered[filtered["department"].isin(selected_departments)]
-
-    if selected_specialties and "specialty" in filtered.columns:
-        filtered = filtered[filtered["specialty"].isin(selected_specialties)]
-
-    filtered = filtered[filtered["riskScore"] >= min_score]
-
-    with main_col:
-        st.markdown("### Risk Distribution and Service Hotspots")
-
-        dist_col, specialty_col = st.columns(2)
-
-        with dist_col:
-            st.markdown("#### Risk Category Distribution")
-            if len(filtered) > 0:
-                risk_order = ["High", "Medium", "Low"]
-                risk_counts = filtered["riskCategory"].value_counts().reindex(risk_order).fillna(0)
-                plot_risk_distribution(risk_counts)
-            else:
-                st.info("No data for selected filters.")
-
-        with specialty_col:
-            st.markdown("#### Average Risk by Specialty")
-            if "specialty" in filtered.columns and len(filtered) > 0:
-                avg_by_specialty = (
-                    filtered.groupby("specialty")["riskScore"]
-                    .mean()
-                    .sort_values(ascending=False)
-                    .head(10)
-                )
-                plot_green_bar(avg_by_specialty, "Average Risk by Specialty", "Average risk score", horizontal=True)
-            else:
-                st.info("No specialty data available.")
-
-    st.divider()
-
-    st.subheader("Top 5 Trust / Specialty Hotspots")
-
-    filtered_hotspots = build_hotspots(filtered)
-
-    if len(filtered_hotspots) > 0:
-        top5_hotspots = filtered_hotspots.head(5).copy()
-
-        visible_hotspot_cols = [
-            "trust_level_code",
-            "department",
-            "specialty",
-            "totalPlans",
-            "highRiskPlans",
-            "mediumRiskPlans",
-            "highRiskRate",
-            "avgRiskScore",
-            "maxRiskScore",
-            "avgTeamAlignment",
-            "operationalPriorityScore",
+    metric_cards(
+        [
+            ("Total JobPlans", f"{len(scored_df):,}", "All scored JobPlans in the current dataset"),
+            ("High Risk", f"{len(high_risk_df):,}", "JobPlans prioritised for immediate review"),
+            ("Average Score", f"{scored_df['riskScore'].mean():.1f}", "Mean risk score across all JobPlans"),
+            ("Active Model", active_display_model, "Single saved model used by dashboard and API"),
         ]
-
-        visible_hotspot_cols = [c for c in visible_hotspot_cols if c in top5_hotspots.columns]
-
-        top5_hotspots["highRiskRate"] = top5_hotspots["highRiskRate"].round(3)
-        top5_hotspots["avgRiskScore"] = top5_hotspots["avgRiskScore"].round(1)
-        top5_hotspots["maxRiskScore"] = top5_hotspots["maxRiskScore"].round(1)
-        top5_hotspots["avgTeamAlignment"] = top5_hotspots["avgTeamAlignment"].round(3)
-        top5_hotspots["operationalPriorityScore"] = top5_hotspots["operationalPriorityScore"].round(1)
-
-        st.dataframe(
-            top5_hotspots[visible_hotspot_cols],
-            use_container_width=True,
-            height=245,
-        )
-
-        chart_hotspots = top5_hotspots.copy()
-        chart_hotspots["group"] = (
-            chart_hotspots["specialty"].astype(str)
-            + " / "
-            + chart_hotspots["trust_level_code"].astype(str)
-        )
-
-        st.markdown("#### High-Risk Plan Count by Hotspot")
-        plot_green_bar(chart_hotspots.set_index("group")["highRiskPlans"], "High-Risk Plan Count by Hotspot", "High risk plans", horizontal=True)
-    else:
-        st.info("No hotspot data available for selected filters.")
-
-    st.divider()
-
-    st.subheader("Top Risk Drivers Across Selected JobPlans")
-
-    drivers = driver_summary(filtered)
-
-    if len(drivers) > 0:
-        driver_col1, driver_col2 = st.columns([2, 1])
-
-        with driver_col1:
-            st.dataframe(
-                drivers.head(10),
-                use_container_width=True,
-                height=320,
-            )
-
-        with driver_col2:
-            st.markdown("#### Driver Frequency")
-            driver_chart = drivers.head(8).set_index("driver")["count"]
-            plot_green_bar(driver_chart, "Driver Frequency", "Count", horizontal=True)
-    else:
-        st.info("No risk drivers available.")
-
-    st.divider()
-
-    st.subheader("Immediate Review Queue")
-
-    review_queue = make_action_queue(filtered).head(25)
-
-    st.dataframe(
-        review_queue,
-        use_container_width=True,
-        height=420,
     )
 
-    st.divider()
+    col1, col2 = st.columns(2)
 
-    st.subheader("Top 5 Highest-Risk JobPlans")
+    with col1:
+        st.markdown(
+            """
+            <div class="light-box">
+                <div class="hero-title">What it does</div>
+                <span class="chip">Scores JobPlans 0–100</span>
+                <span class="chip">Finds highest-risk plans</span>
+                <span class="chip">Explains main drivers</span>
+                <span class="chip">Exports JSON / CSV</span>
+                <span class="chip">Supports API integration</span>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
-    top5 = filtered.sort_values("riskScore", ascending=False).head(5)
+    with col2:
+        st.markdown(
+            """
+            <div class="light-box">
+                <div class="hero-title">What it does not do</div>
+                <span class="chip">Does not approve JobPlans</span>
+                <span class="chip">Does not reject JobPlans</span>
+                <span class="chip">Does not replace clinical judgement</span>
+                <span class="chip">Does not create compliance facts by itself</span>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
-    if len(top5) == 0:
-        st.warning("No JobPlans match the selected filters.")
-    else:
-        for _, row in top5.iterrows():
-            risk_card(row)
+    st.markdown(
+        """
+        <div class="light-box">
+            <div class="hero-title">Current POC status</div>
+            <div class="hero-text">
+                The current dataset is synthetic / staging-shaped and uses pseudo-risk labels.
+                This validates the pipeline, model output, dashboard visibility, API shape, and integration contract.
+                The next step is to replace the dataset with a real staging extract and validate the highest-risk plans with domain experts.
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
-    st.divider()
 
-    st.subheader("All Risk Scores")
+with tab_scores:
+    st.header("Risk Scores")
 
-    display_columns = [
+    st.markdown(
+        """
+        <div class="hero-box">
+            <div class="hero-title">JobPlan-level risk scoring</div>
+            <div class="hero-text">
+                Risk score is assigned to the JobPlan, not to workflow stage.
+                This tab provides the score distribution and a searchable scored output view.
+                Detailed review cards are kept separately in the Highest-Risk JobPlans tab.
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    risk_counts = scored_df["riskCategory"].value_counts()
+
+    metric_cards(
+        [
+            ("High", f"{int(risk_counts.get('High', 0)):,}", "Prioritise first"),
+            ("Medium", f"{int(risk_counts.get('Medium', 0)):,}", "Monitor / review checkpoint"),
+            ("Low", f"{int(risk_counts.get('Low', 0)):,}", "No immediate action"),
+            ("Max Score", f"{scored_df['riskScore'].max():.1f}", "Highest current risk score"),
+        ]
+    )
+
+    distribution_df = pd.DataFrame(
+        [
+            {"Risk Category": "High", "Count": int(risk_counts.get("High", 0))},
+            {"Risk Category": "Medium", "Count": int(risk_counts.get("Medium", 0))},
+            {"Risk Category": "Low", "Count": int(risk_counts.get("Low", 0))},
+        ]
+    )
+
+    st.subheader("Risk Category Distribution")
+    st.dataframe(distribution_df, use_container_width=True, hide_index=True)
+
+    st.subheader("Scored JobPlans")
+    search = st.text_input("Filter by JobPlan, Trust, Department or Specialty", "")
+
+    score_columns = [
         "jobPlanCode",
-        "riskScore",
-        "riskCategory",
-        "trust_level_code",
+        "trustLevelCode",
         "department",
         "specialty",
-        "planning_year",
-        "plan_stage",
-        "totalPAs",
-        "dccPAs",
-        "spaPAs",
-        "priorSpaPAs",
-        "teamPlanAlignmentScore",
-        "historyChangeCount",
-        "dataConfidence",
-        "modelMode",
+        "riskScore",
+        "riskCategory",
         "mainDriversText",
+        "recommendedAction",
     ]
 
-    available_display_columns = [c for c in display_columns if c in filtered.columns]
+    available_score_columns = [col for col in score_columns if col in scored_df.columns]
+    visible_scores = scored_df[available_score_columns].sort_values("riskScore", ascending=False)
 
-    st.dataframe(
-        filtered.sort_values("riskScore", ascending=False)[available_display_columns],
-        use_container_width=True,
-        height=520,
-    )
+    if search.strip():
+        search_lower = search.strip().lower()
+        visible_scores = visible_scores[
+            visible_scores.astype(str).apply(
+                lambda row: row.str.lower().str.contains(search_lower, na=False).any(),
+                axis=1,
+            )
+        ]
 
-    st.download_button(
-        label="Download filtered risk scores CSV",
-        data=filtered.to_csv(index=False).encode("utf-8"),
-        file_name="filtered_risk_scores.csv",
-        mime="text/csv",
-    )
+    st.caption("Showing top 200 rows for dashboard performance. Full output is available in Export / Integration.")
+    st.dataframe(visible_scores.head(200), use_container_width=True, hide_index=True)
 
 
 with tab_high_risk:
-    st.header("🔥 Highest-Risk JobPlans")
+    st.header("JobPlan Review Queue")
 
-    high_risk_df = scored_df[scored_df["riskCategory"] == "High"].copy()
-    high_risk_df = high_risk_df.sort_values("riskScore", ascending=False).reset_index(drop=True)
-
-    OUTPUT_DIR.mkdir(exist_ok=True)
-    high_risk_df.to_csv(OUTPUT_DIR / "high_risk_jobplans.csv", index=False)
-    (OUTPUT_DIR / "high_risk_jobplans.json").write_text(
-        high_risk_df.to_json(orient="records", indent=2),
-        encoding="utf-8",
+    st.markdown(
+        """
+        <div class="hero-box">
+            <div class="hero-title">Review queue</div>
+            <div class="hero-text">
+                This tab shows JobPlans as review cards. By default it focuses on High-Risk JobPlans,
+                but Medium and Low risk cards can also be added for comparison during product or engineering discussions.
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
     )
 
-    if len(high_risk_df) == 0:
-        st.success("No High Risk JobPlans found.")
+    high_risk_sorted = high_risk_df.sort_values("riskScore", ascending=False).reset_index(drop=True)
+    medium_risk_sorted = medium_risk_df.sort_values("riskScore", ascending=False).reset_index(drop=True)
+    low_risk_sorted = low_risk_df.sort_values("riskScore", ascending=False).reset_index(drop=True)
+
+    high_total = int(len(high_risk_sorted))
+    medium_total = int(len(medium_risk_sorted))
+    low_total = int(len(low_risk_sorted))
+
+    filter_col1, filter_col2, filter_col3 = st.columns(3)
+
+    def card_slider(label, total, default_value, key):
+        if total <= 0:
+            st.caption(f"{label}: no JobPlans available")
+            return 0
+
+        return int(
+            st.slider(
+                label,
+                min_value=0,
+                max_value=total,
+                value=min(default_value, total),
+                step=1,
+                key=key,
+            )
+        )
+
+    with filter_col1:
+        high_visible = card_slider(
+            "High-risk cards to show",
+            high_total,
+            12,
+            "high_risk_cards_to_show",
+        )
+
+    with filter_col2:
+        medium_visible = card_slider(
+            "Medium-risk cards to show",
+            medium_total,
+            0,
+            "medium_risk_cards_to_show",
+        )
+
+    with filter_col3:
+        low_visible = card_slider(
+            "Low-risk cards to show",
+            low_total,
+            0,
+            "low_risk_cards_to_show",
+        )
+
+    selected_high = high_risk_sorted.head(high_visible)
+    selected_medium = medium_risk_sorted.head(medium_visible)
+    selected_low = low_risk_sorted.head(low_visible)
+
+    total_selected = len(selected_high) + len(selected_medium) + len(selected_low)
+
+    st.caption(
+        f"Showing {len(selected_high):,} High-risk, {len(selected_medium):,} Medium-risk, "
+        f"and {len(selected_low):,} Low-risk JobPlan cards "
+        f"({total_selected:,} total visible). "
+        f"Available: {high_total:,} High, {medium_total:,} Medium, {low_total:,} Low."
+    )
+
+    if total_selected == 0:
+        st.info("No cards selected. Increase one of the filters above to display JobPlans.")
     else:
-        num_cols = 4
-        rows = list(high_risk_df.iterrows())
+        sections = [
+            ("High", selected_high),
+            ("Medium", selected_medium),
+            ("Low", selected_low),
+        ]
 
-        for i in range(0, len(rows), num_cols):
-            cols = st.columns(num_cols, gap="large")
-            for j in range(num_cols):
-                if i + j < len(rows):
-                    _, row = rows[i + j]
-                    with cols[j]:
-                        component_risk_card(row)
+        for section_label, section_df in sections:
+            if len(section_df) == 0:
+                continue
+
+            st.subheader(f"{section_label}-Risk JobPlans")
+
+            rows = list(section_df.iterrows())
+
+            for i in range(0, len(rows), 3):
+                cols = st.columns(3, gap="medium")
+                for j in range(3):
+                    if i + j < len(rows):
+                        _, row = rows[i + j]
+                        with cols[j]:
+                            risk_card(row)
 
 
-with tab_eval:
-    st.header("📈 Model Evaluation")
-
-    st.info(
-        "Evaluation proves that the ML pipeline can learn the pseudo-risk labels. "
-        "For production, the same evaluation must be repeated on real staging/historical data."
-    )
-
-    e1, e2, e3, e4 = st.columns(4)
-    e1.metric("Rows Total", f"{evaluation_report['rowsTotal']:,}")
-    e2.metric("Train Rows", f"{evaluation_report['rowsTrain']:,}")
-    e3.metric("Test Rows", f"{evaluation_report['rowsTest']:,}")
-    e4.metric("Test Positive Rate", f"{evaluation_report['positiveRateTest']:.3f}")
-
-    st.write(f"Split strategy: `{evaluation_report['splitStrategy']}`")
-
-    model_name = st.selectbox(
-        "Select model",
-        list(evaluation_report["models"].keys()),
-        key="evaluation_model_select",
-    )
-
-    metrics = evaluation_report["models"][model_name]
-
-    m1, m2, m3, m4, m5, m6 = st.columns(6)
-    m1.metric("Accuracy", f"{metrics['accuracy']:.3f}")
-    m2.metric("Precision", f"{metrics['precision']:.3f}")
-    m3.metric("Recall", f"{metrics['recall']:.3f}")
-    m4.metric("F1", f"{metrics['f1']:.3f}")
-    m5.metric("ROC-AUC", f"{metrics['rocAuc']:.3f}")
-    m6.metric("Avg Precision", f"{metrics['averagePrecision']:.3f}")
-
-    st.subheader("Confusion Matrix")
-
-    cm = pd.DataFrame(
-        metrics["confusionMatrix"],
-        index=["Actual Low/Normal", "Actual At-Risk"],
-        columns=["Predicted Low/Normal", "Predicted At-Risk"],
-    )
-
-    st.dataframe(cm, use_container_width=True)
-
-    st.subheader("Metric Interpretation")
+with tab_drivers:
+    st.header("Drivers & Hotspots")
 
     st.markdown(
         """
-        - **Accuracy**: overall correctness.
-        - **Precision**: when the model flags risk, how often it is correct.
-        - **Recall**: how many risky plans it catches.
-        - **F1**: balance between precision and recall.
-        - **ROC-AUC**: how well the model ranks risky plans above normal plans.
-        - **Average Precision**: useful when risk cases are fewer than normal cases.
-        """
+        <div class="hero-box">
+            <div class="hero-title">Why JobPlans are being prioritised</div>
+            <div class="hero-text">
+                This tab helps product and engineering teams understand which risk signals are appearing most often
+                and where high-risk plans are concentrated.
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
     )
 
-    with st.expander("Full evaluation JSON"):
-        st.json(evaluation_report)
+    driver_rows = []
+    for _, row in scored_df.iterrows():
+        for driver in parse_drivers(row.get("mainDrivers", [])):
+            driver_rows.append(
+                {
+                    "Driver": driver,
+                    "Risk Category": row.get("riskCategory"),
+                    "Risk Score": row.get("riskScore"),
+                    "Trust": row.get("trustLevelCode"),
+                    "Department": row.get("department"),
+                    "Specialty": row.get("specialty"),
+                }
+            )
 
+    driver_df = pd.DataFrame(driver_rows)
 
-with tab_train:
-    st.header("🧠 Training Details")
+    if len(driver_df) == 0:
+        st.info("No risk driver information available.")
+    else:
+        st.subheader("Most Frequent Risk Drivers")
+
+        driver_frequency = (
+            driver_df.groupby("Driver")
+            .size()
+            .reset_index(name="Count")
+            .sort_values("Count", ascending=False)
+        )
+
+        st.dataframe(driver_frequency.head(15), use_container_width=True, hide_index=True)
+
+    st.subheader("High-Risk Hotspots")
+
+    hotspot_columns = ["trustLevelCode", "department", "specialty"]
+
+    hotspot_df = (
+        high_risk_df.groupby(hotspot_columns)
+        .agg(
+            HighRiskJobPlans=("jobPlanCode", "count"),
+            AverageRiskScore=("riskScore", "mean"),
+            MaxRiskScore=("riskScore", "max"),
+        )
+        .reset_index()
+        .sort_values(["HighRiskJobPlans", "AverageRiskScore"], ascending=False)
+    )
+
+    hotspot_df["AverageRiskScore"] = hotspot_df["AverageRiskScore"].round(1)
+    hotspot_df["MaxRiskScore"] = hotspot_df["MaxRiskScore"].round(1)
+
+    st.dataframe(hotspot_df.head(50), use_container_width=True, hide_index=True)
 
     st.markdown(
         """
-        This tab is mainly for engineering/data science review.
-        For stakeholders, the Risk Scores tab is the main value.
-        """
+        <div class="light-box">
+            <div class="hero-title">Product / Engineering interpretation</div>
+            <div class="hero-text">
+                Hotspots can help decide where to focus validation with domain experts.
+                Driver frequency can also help engineering confirm which features and rule-engine findings should be prioritised for real-data integration.
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
     )
 
-    st.json(training_metadata)
 
-    st.subheader("Training Files Created")
+with tab_model:
+    st.header("Model & Training")
 
-    for file in [
-        "models/risk_model.joblib",
-        "models/metadata.json",
-        "outputs/training_metadata.json",
-    ]:
-        path = Path(file)
-        if path.exists():
-            st.success(f"{file} exists")
-        else:
-            st.warning(f"{file} not found")
+    st.markdown(
+        f"""
+        <div class="hero-box">
+            <div class="hero-title">Active Model: {html.escape(active_display_model)}</div>
+            <div class="hero-text">
+                The dashboard and API use the single trained model saved in <b>models/risk_model.joblib</b>.
+                Histogram-based Gradient Boosting is a good fit for this POC because it handles mixed operational signals well
+                and can capture non-linear risk patterns without requiring a large deep-learning setup.
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
-    st.subheader("POC Model Logic")
 
     st.markdown(
         """
-        The model combines:
-        1. **ML component** — learned pattern from PA mix, trends, peer context, workflow and TJP signals.
-        2. **Rule component** — deterministic risk factors such as PA limit breach, SPA increase, team-plan misalignment, mediation/appeal and returned-to-discussion signals.
-        3. **Final risk score** — blended into a 0–100 score with High / Medium / Low category.
-        """
+        <div class="light-box">
+            <div class="hero-title">Where ML and rule-based risk live</div>
+            <div class="hero-text">
+                The trained ML model is stored in <b>models/risk_model.joblib</b>.
+                Rule-based risk evidence is not stored inside the model file; it is implemented in the scoring
+                and explanation code, mainly <b>src/jobplan_risk/explain.py</b>.
+                The final risk score is produced in <b>src/jobplan_risk/score.py</b> by combining the ML prediction
+                with rule-based evidence such as PA limit breach, SPA increase, DCC reduction, low team-plan alignment,
+                missing team-plan link, and workflow instability.
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
     )
 
+    training_info = metadata.get("training_info", metadata.get("training", {}))
+    feature_columns = (
+        metadata.get("feature_columns")
+        or metadata.get("features")
+        or metadata.get("input_features")
+        or []
+    )
 
-with tab_data:
-    st.header("📄 Dataset Overview")
+    feature_count = len(feature_columns) if feature_columns else "N/A"
+    training_rows = (
+        training_info.get("training_rows")
+        or training_info.get("rows")
+        or metadata.get("training_rows")
+        or len(scored_df)
+    )
+    positive_rate = training_info.get("positive_rate") or metadata.get("positive_rate") or "N/A"
 
-    d1, d2, d3, d4 = st.columns(4)
-    d1.metric("Rows", f"{len(df):,}")
-    d2.metric("Columns", f"{len(df.columns):,}")
-    d3.metric("Planning Years", df["planning_year"].nunique() if "planning_year" in df.columns else "N/A")
-    d4.metric("Specialties", df["specialty"].nunique() if "specialty" in df.columns else "N/A")
+    if isinstance(positive_rate, float):
+        positive_rate_display = f"{positive_rate:.2%}"
+    else:
+        positive_rate_display = str(positive_rate)
 
-    left_data, right_data = st.columns(2)
+    metric_cards(
+        [
+            ("Training / Scoring Rows", f"{training_rows}", "Current dataset size used by the POC"),
+            ("Feature Count", f"{feature_count}", "Model input signals where available"),
+            ("Training Risk Label Rate", positive_rate_display, "Share of POC training rows labelled as review-risk"),
+            ("Model Artifact", "risk_model.joblib", "Single model used by dashboard and API"),
+        ]
+    )
 
-    with left_data:
-        st.subheader("Plans by Planning Year")
-        if "planning_year" in df.columns:
-            plot_green_bar(df["planning_year"].value_counts().sort_index(), "Plans by Planning Year", "Plans")
+    st.subheader("Evaluation Metrics")
 
-    with right_data:
-        st.subheader("Plans by Specialty")
-        if "specialty" in df.columns:
-            plot_green_bar(df["specialty"].value_counts().head(20), "Plans by Specialty", "Plans", horizontal=True)
+    metric_labels = {
+        "accuracy": "Accuracy",
+        "precision": "Precision",
+        "recall": "Recall",
+        "f1": "F1 Score",
+        "roc_auc": "ROC-AUC",
+        "average_precision": "Average Precision",
+    }
 
-    st.subheader("Input Feature Table Preview")
-    st.dataframe(df.head(100), use_container_width=True, height=500)
+    eval_rows = []
+    for key, label in metric_labels.items():
+        value = metric_value(active_metrics, key)
+        if value is not None:
+            eval_rows.append(
+                {
+                    "Metric": label,
+                    "Value": round(float(value), 4) if isinstance(value, (int, float)) else value,
+                }
+            )
 
-    with st.expander("Dataset columns"):
-        st.write(list(df.columns))
+    if eval_rows:
+        st.dataframe(pd.DataFrame(eval_rows), use_container_width=True, hide_index=True)
+    else:
+        st.warning("No active-model evaluation metrics found. Regenerate outputs/evaluation_report.json if needed.")
+
+    st.subheader("What Determines the JobPlan Risk Score")
+
+    st.markdown(
+        """
+        <div class="light-box">
+            <div class="hero-title">Risk scoring logic</div>
+            <div class="hero-text">
+                The JobPlan risk score is produced from a hybrid approach. The trained ML model is stored in
+                <b>models/risk_model.joblib</b> and predicts review risk from patterns across PA allocation,
+                SPA/DCC movement, peer deviation, team-plan alignment, capacity-gap indicators, workflow instability,
+                and locum/contract signals.
+                <br><br>
+                Rule-based risk evidence is not stored inside the model file. It is implemented in the scoring and
+                explanation code, mainly <b>src/jobplan_risk/explain.py</b>. The final risk score is produced in
+                <b>src/jobplan_risk/score.py</b> by combining the ML prediction with transparent rule-based evidence
+                such as PA limit breach, SPA increase, DCC reduction, low team-plan alignment, missing team-plan link,
+                and workflow instability.
+                <br><br>
+                The score is used only to prioritise review, not to approve or reject a JobPlan.
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    st.markdown(
+        """
+        <div class="light-box">
+            <span class="chip">SPA / DCC drift</span>
+            <span class="chip">Prior-year PA changes</span>
+            <span class="chip">PA limit breach signals</span>
+            <span class="chip">Peer deviation</span>
+            <span class="chip">Team-plan alignment</span>
+            <span class="chip">Capacity-gap indicators</span>
+            <span class="chip">Workflow instability</span>
+            <span class="chip">Locum / contract flags</span>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    st.subheader("POC Limitation")
+
+    st.markdown(
+        """
+        <div class="light-box">
+            <div class="hero-text">
+                The current model uses synthetic / staging-shaped data and pseudo-risk labels.
+                The evaluation validates the ML pipeline and dashboard behaviour, not production accuracy.
+                The next step is to use a real staging extract and validate the highest-risk plans with domain experts.
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    st.subheader("Artifacts")
+
+    st.markdown(
+        """
+        <div class="light-box">
+            <div class="light-line">models/risk_model.joblib — active trained model</div>
+            <div class="light-line">models/metadata.json — feature schema and training metadata</div>
+            <div class="light-line">outputs/evaluation_report.json — active model evaluation</div>
+            <div class="light-line">outputs/risk_scores.json — full scored output</div>
+            <div class="light-line">outputs/high_risk_jobplans.json — focused integration handoff</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 
 with tab_export:
-    st.header("🔌 Export / Integration")
+    st.header("Export & Integration")
 
     st.markdown(
         """
-        The risk scores are structured outputs and can be consumed by:
-        - Bedrock narrative layer
-        - n8n workflow
-        - rule engine
-        - demo UI
-        - future JobPlan analyser service
-        """
-    )
-
-    st.subheader("Generated Output Files")
-
-    for path in [
-        risk_scores_csv_path,
-        risk_scores_json_path,
-        evaluation_report_path,
-        training_metadata_path,
-    ]:
-        if path.exists():
-            st.success(str(path))
-        else:
-            st.warning(f"Missing: {path}")
-
-    st.subheader("Integration Contract")
-
-    st.code(
-        """
-{
-  "jobPlanCode": "JP-2026-000123",
-  "riskScore": 82.4,
-  "riskCategory": "High",
-  "mainDrivers": [
-    "SPA increased compared with prior plan.",
-    "Team-plan alignment score is low.",
-    "High history change count detected."
-  ],
-  "dataConfidence": "High",
-  "modelMode": "supervised",
-  "modelRiskComponent": 88.2,
-  "ruleRiskComponent": 75.1
-}
+        <div class="hero-box">
+            <div class="hero-title">Structured ML output for integration</div>
+            <div class="hero-text">
+                This section provides the JSON/CSV handoff for the wider analyser workflow.
+                The payload is intentionally focused: JobPlan identity, Trust context, Department/Specialty,
+                risk score, risk category, drivers, recommended action, and risk components.
+                Stage is intentionally excluded.
+            </div>
+        </div>
         """,
-        language="json",
+        unsafe_allow_html=True,
     )
 
-    st.download_button(
-        label="Download all risk scores CSV",
-        data=scored_df.to_csv(index=False).encode("utf-8"),
-        file_name="risk_scores.csv",
-        mime="text/csv",
+    metric_cards(
+        [
+            ("Full Scored Output", f"{len(scored_df):,}", "All scored JobPlans"),
+            ("High-Risk Handoff", f"{len(handoff_df):,}", "Focused review-prioritisation payload"),
+            ("Export Format", "JSON / CSV", "Ready for demo or downstream service"),
+            ("Decision Policy", "Review Only", "No automated approval or rejection"),
+        ]
     )
 
-    st.download_button(
-        label="Download evaluation report JSON",
-        data=json.dumps(evaluation_report, indent=2).encode("utf-8"),
-        file_name="evaluation_report.json",
-        mime="application/json",
+    st.subheader("Recommended Export Files")
+
+    st.markdown(
+        """
+        <div class="light-box">
+            <div class="light-line">outputs/high_risk_jobplans.json</div>
+            <div class="light-line">outputs/high_risk_jobplans.csv</div>
+            <div class="light-line">outputs/risk_scores.json</div>
+            <div class="light-line">outputs/risk_scores.csv</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
     )
 
+    dl1, dl2 = st.columns(2)
 
-st.markdown("---")
-st.caption(
-    "POC note: current data is synthetic/pseudo-labelled. "
-    "This validates the ML pipeline, scoring flow and stakeholder dashboard. "
-    "Real staging data is required before claiming production accuracy."
-)
+    with dl1:
+        st.download_button(
+            label="Download high_risk_jobplans.json",
+            data=handoff_df.to_json(orient="records", indent=2).encode("utf-8"),
+            file_name="high_risk_jobplans.json",
+            mime="application/json",
+        )
+
+    with dl2:
+        st.download_button(
+            label="Download high_risk_jobplans.csv",
+            data=handoff_df.to_csv(index=False).encode("utf-8"),
+            file_name="high_risk_jobplans.csv",
+            mime="text/csv",
+        )
+
+    st.subheader("Integration Flow")
+
+    st.markdown(
+        """
+        <div class="light-box">
+            <div class="flow-step">Rule engine findings</div>
+            <div class="flow-arrow">+</div>
+            <div class="flow-step">ML risk output</div>
+            <div class="flow-arrow">↓</div>
+            <div class="flow-step">LLM explanation</div>
+            <div class="flow-arrow">↓</div>
+            <div class="flow-step">Dashboard / stakeholder narrative</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    st.info(
+        "The LLM should explain computed facts from the rule engine and ML layer. "
+        "It should not invent compliance numbers or create risk scores by itself."
+    )
+
+    st.subheader("Demo API Endpoints")
+
+    st.markdown(
+        """
+        <div class="light-box">
+            <div class="endpoint-row"><span class="method-badge">GET</span><span class="endpoint-path">/health</span></div>
+            <div class="endpoint-row"><span class="method-badge">GET</span><span class="endpoint-path">/api/v1/jobplans/{jobPlanCode}/analysis</span></div>
+            <div class="endpoint-row"><span class="method-badge">GET</span><span class="endpoint-path">/api/v1/departments/{trustLevelCode}/summary</span></div>
+            <div class="endpoint-row"><span class="method-badge">POST</span><span class="endpoint-path">/api/v1/analysis/batch</span></div>
+            <div class="endpoint-row"><span class="method-badge">POST</span><span class="endpoint-path">/api/v1/scenarios/simulate</span></div>
+            <div class="endpoint-row"><span class="method-badge">POST</span><span class="endpoint-path">/score</span></div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    st.subheader("Example Handoff JSON")
+
+    if len(handoff_df) > 0:
+        sample = handoff_df.iloc[0]
+        example = example_handoff_json(sample)
+        example_json = json.dumps(example, indent=2, default=str)
+
+        st.text_area(
+            "Example Handoff JSON",
+            value=example_json,
+            height=420,
+        )
+    else:
+        st.warning("No High-Risk JobPlans are currently available for export.")
+
+    st.subheader("What this output is for")
+
+    st.markdown(
+        """
+        <div class="light-box">
+            <span class="chip">Product and stakeholder demo</span>
+            <span class="chip">Rule-engine + ML integration</span>
+            <span class="chip">LLM explanation input</span>
+            <span class="chip">Highest-risk review queue</span>
+            <span class="chip">Evidence-based prioritisation</span>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
